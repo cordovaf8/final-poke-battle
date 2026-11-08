@@ -12,12 +12,43 @@
   const ITEMS = [
     { id: 'potion', name: 'Potion', qty: 5, target: 'ally', heal: 20, text: 'Restores 20 HP to one Pokémon.' },
     { id: 'super-potion', name: 'Super Potion', qty: 3, target: 'ally', heal: 60, text: 'Restores 60 HP to one Pokémon.' },
+    { id: 'full-heal', name: 'Full Heal', qty: 2, target: 'afflicted', text: 'Cures any status condition and confusion.' },
     { id: 'revive', name: 'Revive', qty: 2, target: 'fainted', text: 'Revives a fainted Pokémon with half its HP.' },
     { id: 'ether', name: 'Ether', qty: 2, target: 'self', text: "Restores 10 PP to each of the user's attacks." },
     { id: 'x-attack', name: 'X Attack', qty: 2, target: 'self', text: "Sharply raises the user's Attack for the rest of the battle." },
   ];
   // Used by wild Pokémon that know no damaging attacks.
-  const TACKLE = { name: 'Tackle', type: 'normal', category: 'physical', power: 40, accuracy: 100, pp: 35 };
+  const TACKLE = {
+    name: 'Tackle', type: 'normal', category: 'physical', power: 40, accuracy: 100, pp: 35, target: 'selected-pokemon',
+    ailment: 'none', ailmentChance: 0, statChanges: [], statChance: 0, effectCategory: 'damage', healing: 0, drain: 0,
+    effect: '',
+  };
+
+  // Status conditions: HUD tag, sprite icon and the message when one is inflicted.
+  const STATUS_INFO = {
+    burn: { tag: 'BRN', icon: '🔥', text: 'was burned!' },
+    poison: { tag: 'PSN', icon: '☠️', text: 'was poisoned!' },
+    paralysis: { tag: 'PAR', icon: '⚡', text: 'is paralyzed! It may be unable to move!' },
+    sleep: { tag: 'SLP', icon: '💤', text: 'fell asleep!' },
+    freeze: { tag: 'FRZ', icon: '❄️', text: 'was frozen solid!' },
+  };
+  const SUPPORTED_AILMENTS = new Set([...Combat.STATUSES, 'confusion']);
+  const STAT_LABELS = {
+    attack: 'Atk', defense: 'Def', 'special-attack': 'SpA', 'special-defense': 'SpD',
+    speed: 'Spe', accuracy: 'Acc', evasion: 'Eva',
+  };
+  // Who a status move affects, from PokéAPI's move.target.
+  const SELF_TARGETS = new Set(['user', 'users-field', 'user-and-allies', 'ally', 'user-or-ally', 'all-allies']);
+  const FOE_TARGETS = new Set(['selected-pokemon', 'selected-pokemon-me-first', 'random-opponent', 'all-other-pokemon', 'specific-move']);
+  const moveScope = move => {
+    if (move.category !== 'status') return 'foe';
+    if (SELF_TARGETS.has(move.target)) return 'self';
+    if (move.target === 'all-opponents') return 'foes';
+    return FOE_TARGETS.has(move.target) ? 'foe' : 'none';
+  };
+  // Field effects, switching and the like aren't modeled, so those status moves do nothing yet.
+  const statusMoveWorks = m => moveScope(m) !== 'none'
+    && (m.statChanges.length > 0 || SUPPORTED_AILMENTS.has(m.ailment) || m.healing > 0);
 
   const $ = sel => document.querySelector(sel);
   const els = {
@@ -27,8 +58,11 @@
     command: $('#command'), commandTitle: $('#commandTitle'), attackMenu: $('#attackMenu'),
     moveList: $('#moveList'), itemMenu: $('#itemMenu'), itemList: $('#itemList'), flash: $('#flash'),
     result: $('#result'), resultTitle: $('#resultTitle'), resultText: $('#resultText'), againBtn: $('#againBtn'),
-    music: $('#musicBtn'),
+    music: $('#musicBtn'), viewBtn: $('#viewBtn'), plates: $('#plates'), enemyWindow: $('.enemy-window'),
   };
+  const VIEW_KEY = 'battleView';
+  // How far the commanded Pokémon steps toward the enemy (px).
+  const STEP_FORWARD = 28;
 
   // party / enemies hold fighters (see Combat.createFighter). ready: party indexes with a full gauge, in fill order.
   const battle = {
@@ -45,7 +79,8 @@
   const article = word => (/^[aeiou]/i.test(word) ? 'an' : 'a');
   const attr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const typeBadge = t => `<span class="type" style="--type: var(--${t})">${t}</span>`;
-  const atbDuration = (base, scale = 1) => gsap.utils.clamp(2, 7, 300 / (base.speed || 50)) * scale;
+  // Seconds for a full gauge: base Speed sets it, then Speed stages and paralysis adjust it.
+  const atbDuration = (f, scale = 1) => (gsap.utils.clamp(2, 7, 300 / (f.base.speed || 50)) * scale) / Combat.speedFactor(f);
   // Heavier attacks take longer to recover from: the gauge refills slower afterwards
   // (40 power ≈ ×0.87, 90 ≈ ×1.2, 150 ≈ ×1.6).
   const RECOVERY = { defend: 0.7, item: 1, status: 0.8 };
@@ -54,7 +89,8 @@
     : gsap.utils.clamp(0.8, 1.8, 0.6 + (move.power ?? 60) / 150));
   const living = list => list.filter(f => !f.fainted);
 
-  const rowOf = f => (f.side === 'party' ? els.partyRows : els.enemyRows).children[f.index];
+  // A fighter's HUD row moves between the bottom panel and its nameplate depending on the view.
+  const rowOf = f => f.row;
   const unitOf = f => (f.side === 'party' ? battle.units : battle.enemyUnits)[f.index];
   const innerOf = unit => unit.querySelector('.unit-inner');
   const imgOf = f => unitOf(f).querySelector('img');
@@ -201,6 +237,7 @@
         <span class="unit-target"></span>
         <span class="unit-shadow"></span>
         <span class="unit-shield"></span>
+        <span class="unit-status"></span>
         <img class="unit-sprite" alt="${f.name}">
       </div>`;
     return unit;
@@ -241,7 +278,11 @@
       <${open} class="unit-row ${f.side}-row unit-grid" data-i="${f.index}">
         <span class="row-name">${f.name}<span class="row-guard"></span></span>
         <span class="row-hp">
-          <span class="num"><b>${f.hp}</b>/${f.maxHp}</span>
+          <span class="num-line">
+            <span class="num"><b>${f.hp}</b>/${f.maxHp}</span>
+            <span class="row-status"></span>
+            <span class="row-stages"></span>
+          </span>
           <span class="bar hp"><i></i></span>
         </span>
         <span class="bar atb"><i></i></span>
@@ -251,6 +292,84 @@
   function renderHud() {
     els.partyRows.innerHTML = battle.party.map(unitRow).join('');
     els.enemyRows.innerHTML = battle.enemies.map(unitRow).join('');
+    battle.party.forEach((f, i) => { f.row = els.partyRows.children[i]; });
+    battle.enemies.forEach((f, i) => { f.row = els.enemyRows.children[i]; });
+  }
+
+  // ---------- Views ----------
+  // Traditional: info and commands live in the bottom panel.
+  // Advanced: no panel; each Pokémon has a floating nameplate and the menu pops up beside the active one.
+
+  const isAdvanced = () => battle.view === 'advanced';
+
+  function setView(view) {
+    battle.view = view;
+    try { localStorage.setItem(VIEW_KEY, view); } catch { /* storage unavailable */ }
+    document.body.classList.toggle('view-advanced', isAdvanced());
+    els.viewBtn.textContent = `View: ${capitalize(view)}`;
+
+    for (const f of [...battle.party, ...battle.enemies]) {
+      if (isAdvanced()) {
+        if (!f.plate) {
+          f.plate = document.createElement('div');
+          f.plate.className = `plate ${f.side}-plate`;
+        }
+        f.plate.appendChild(f.row);
+        els.plates.appendChild(f.plate);
+      } else {
+        // Appending in index order rebuilds the panel lists in their original order.
+        (f.side === 'party' ? els.partyRows : els.enemyRows).appendChild(f.row);
+      }
+    }
+    if (isAdvanced()) els.field.appendChild(els.commandPanel);
+    else els.hud.insertBefore(els.commandPanel, els.enemyWindow);
+    relayout();
+  }
+
+  // The field changes size between views, so sprites, nameplates and the menu are re-placed.
+  function relayout() {
+    els.units.querySelectorAll('img').forEach(sizeSprite);
+    positionPlates();
+    positionPanel();
+  }
+
+  const PLATE_LIFT = 30; // gap between a nameplate and the sprite, room for the cursor arrow
+
+  function positionPlates() {
+    if (!isAdvanced()) return;
+    const field = els.field.getBoundingClientRect();
+    const plates = [...battle.party, ...battle.enemies].map(f => {
+      const img = imgOf(f).getBoundingClientRect();
+      const box = img.width ? img : unitOf(f).getBoundingClientRect();
+      return { el: f.plate, x: box.left + box.width / 2 - field.left, y: box.top - field.top, w: f.plate.offsetWidth, h: f.plate.offsetHeight };
+    });
+    // Neighbouring Pokémon can stack their plates; place front-row plates first and lift any back-row plate that collides.
+    plates.sort((a, b) => b.y - a.y);
+    plates.forEach((p, i) => {
+      for (const q of plates.slice(0, i)) {
+        const overlapX = Math.abs(p.x - q.x) < (p.w + q.w) / 2 + 4;
+        const pBottom = p.y - PLATE_LIFT;
+        const qTop = q.y - PLATE_LIFT - q.h;
+        if (overlapX && pBottom > qTop - 4 && pBottom - p.h < q.y - PLATE_LIFT + 4) p.y = qTop - 4 + PLATE_LIFT;
+      }
+      p.el.style.left = `${p.x}px`;
+      p.el.style.top = `${Math.max(p.y, p.h + PLATE_LIFT + 52)}px`;
+    });
+  }
+
+  // Puts the floating menu beside the commanded Pokémon, kept inside the field.
+  function positionPanel() {
+    if (!isAdvanced() || battle.active == null) return;
+    const field = els.field.getBoundingClientRect();
+    const f = battle.party[battle.active];
+    const sprite = imgOf(f).getBoundingClientRect();
+    const panel = els.commandPanel;
+    // Measured before the step-forward finishes, so add whatever of it is still to come.
+    const stepLeft = STEP_FORWARD - gsap.getProperty(innerOf(unitOf(f)), 'x');
+    const left = sprite.right - field.left + 20 + stepLeft;
+    const top = sprite.top - field.top + sprite.height / 2 - panel.offsetHeight / 2;
+    panel.style.left = `${gsap.utils.clamp(8, field.width - panel.offsetWidth - 8, left)}px`;
+    panel.style.top = `${gsap.utils.clamp(56, field.height - panel.offsetHeight - 8, top)}px`;
   }
 
   function updateHp(f) {
@@ -315,8 +434,8 @@
     if (f.fainted || battle.over) return;
     const row = rowOf(f);
     row.classList.remove('ready');
-    fillAtb(f, atbDuration(f.base, factor), from, () => {
-      if (f.fainted || battle.over) return;
+    fillAtb(f, atbDuration(f, factor), from, () => {
+      if (f.fainted || battle.over || !startTurn(f)) return;
       row.classList.add('ready');
       battle.ready.push(i);
       if (battle.active == null) activate(i);
@@ -326,7 +445,55 @@
   function fillEnemyAtb(j, from = 0, factor = 1) {
     const f = battle.enemies[j];
     if (f.fainted || battle.over) return;
-    fillAtb(f, atbDuration(f.base, ENEMY_ATB_SCALE * factor), from, () => gsap.delayedCall(rand(0.2, 0.7), () => enemyAct(j)));
+    fillAtb(f, atbDuration(f, ENEMY_ATB_SCALE * factor), from, () => gsap.delayedCall(rand(0.2, 0.7), () => enemyAct(j)));
+  }
+
+  const refillAtb = (f, factor = 1) => (f.side === 'party' ? fillPartyAtb(f.index, 0, factor) : fillEnemyAtb(f.index, 0, factor));
+
+  // Runs each time a gauge fills: poison/burn damage, then sleep, freeze or paralysis may cost the turn.
+  function startTurn(f) {
+    if (f.status === 'burn' || f.status === 'poison') {
+      const burn = f.status === 'burn';
+      const damage = Math.max(1, Math.floor(f.maxHp / (burn ? 16 : 8)));
+      blink(imgOf(f));
+      popup(f, damage, 'damage', burn ? 'Burn' : 'Poison');
+      setHp(f, f.hp - damage);
+      if (f.fainted) return false;
+    }
+    if (f.status === 'sleep') {
+      f.sleepTurns -= 1;
+      if (f.sleepTurns > 0) return loseTurn(f, `${displayName(f)} is fast asleep.`);
+      cure(f, `${displayName(f)} woke up!`);
+    } else if (f.status === 'freeze') {
+      if (Math.random() >= 0.2) return loseTurn(f, `${displayName(f)} is frozen solid!`);
+      cure(f, `${displayName(f)} thawed out!`);
+    } else if (f.status === 'paralysis' && Math.random() < 0.25) {
+      return loseTurn(f, `${displayName(f)} is paralyzed! It can't move!`);
+    }
+    return true;
+  }
+
+  function loseTurn(f, text) {
+    showMessage(text);
+    popup(f, STATUS_INFO[f.status].tag, 'status');
+    drainAtb(rowOf(f));
+    gsap.delayedCall(0.8, () => refillAtb(f));
+    return false;
+  }
+
+  // Sleep or freeze landing on a party member who's waiting for orders takes the turn away.
+  function interruptTurn(f) {
+    if (f.side !== 'party' || !battle.ready.includes(f.index)) return;
+    battle.ready = battle.ready.filter(r => r !== f.index);
+    rowOf(f).classList.remove('ready');
+    if (battle.active === f.index) {
+      standDown(f.index, true);
+      battle.active = null;
+      closeMenus();
+    }
+    drainAtb(rowOf(f));
+    refillAtb(f);
+    activateNext();
   }
 
   // Take command of a ready party member. Switching away doesn't spend the other one's turn.
@@ -338,7 +505,7 @@
     const unit = unitOf(f);
     rowOf(f).classList.add('active');
     unit.classList.add('active');
-    gsap.to(innerOf(unit), { x: 28, duration: 0.3, ease: 'power2.out' });
+    gsap.to(innerOf(unit), { x: STEP_FORWARD, duration: 0.3, ease: 'power2.out' });
     gsap.fromTo(unit.querySelector('.unit-cursor'), { y: 0 }, { y: -6, duration: 0.3, ease: 'steps(1)', repeat: -1, yoyo: true });
     els.commandTitle.textContent = f.name;
     renderMoves(i);
@@ -394,13 +561,158 @@
       .to({}, { duration: 0.3 });
   }
 
-  // Resolves one attack at the moment it lands.
-  function strike(attacker, target, move) {
-    if (battle.over || attacker.fainted) return;
-    // Real time: the chosen target may have fainted mid-swing.
-    if (target.fainted) target = pick(living(attacker.side === 'party' ? battle.enemies : battle.party));
-    if (!target) return;
+  // A small hop for moves aimed at the user (Swords Dance, Recover…).
+  function cast(tl, unit, onHit) {
+    tl.to(innerOf(unit), { y: -16, duration: 0.15, yoyo: true, repeat: 1, ease: 'power2.out' })
+      .add(onHit)
+      .to({}, { duration: 0.4 });
+  }
 
+  // Resolves a move at the moment it lands: confusion first, then damage or the status effect.
+  function resolveMove(attacker, target, move) {
+    if (battle.over || attacker.fainted) return;
+    if (confusedSelfHit(attacker)) return;
+    const foes = attacker.side === 'party' ? battle.enemies : battle.party;
+    const scope = moveScope(move);
+    // Real time: the chosen target may have fainted mid-swing.
+    if (scope === 'foe' && (!target || target.fainted)) target = pick(living(foes));
+    if (scope === 'foe' && !target) return;
+
+    if (move.category !== 'status') {
+      strike(attacker, target, move);
+    } else if (!statusMoveWorks(move)) {
+      popup(attacker, 'No effect', 'miss');
+    } else if (scope === 'self') {
+      if (!applyStatusMove(attacker, attacker, move)) popup(attacker, 'Failed', 'miss');
+    } else {
+      for (const t of scope === 'foes' ? living(foes) : [target]) {
+        if (!Combat.hits(attacker, t, move)) popup(t, 'Miss', 'miss');
+        else if (!applyStatusMove(attacker, t, move)) popup(t, 'Failed', 'miss');
+      }
+    }
+  }
+
+  function applyStatusMove(user, target, move) {
+    let worked = false;
+    if (move.statChanges.length) worked = changeStats(target, move.statChanges) || worked;
+    if (SUPPORTED_AILMENTS.has(move.ailment) && (!move.ailmentChance || Math.random() * 100 < move.ailmentChance)) {
+      worked = inflict(target, move.ailment) || worked;
+    }
+    if (move.healing > 0 && user.hp < user.maxHp) {
+      heal(user, Math.floor((user.maxHp * move.healing) / 100));
+      worked = true;
+    }
+    return worked;
+  }
+
+  // Extra effects of damaging attacks: drain/recoil, status chances, stat changes.
+  function applySecondary(user, target, move, damage) {
+    if (move.drain) {
+      const amount = Math.max(1, Math.round((damage * Math.abs(move.drain)) / 100));
+      if (move.drain > 0) {
+        heal(user, amount, 'Drain');
+      } else {
+        popup(user, amount, 'damage', 'Recoil');
+        setHp(user, user.hp - amount);
+      }
+    }
+    if (!target.fainted && SUPPORTED_AILMENTS.has(move.ailment) && Math.random() * 100 < move.ailmentChance) {
+      inflict(target, move.ailment);
+    }
+    if (move.statChanges.length && Math.random() * 100 < (move.statChance || 100)) {
+      // "damage-raise" moves change the user's stats (Flame Charge, Close Combat); the rest hit the target's.
+      const who = move.effectCategory === 'damage-raise' ? user : target;
+      if (!who.fainted) changeStats(who, move.statChanges);
+    }
+  }
+
+  function confusedSelfHit(f) {
+    if (!f.confused) return false;
+    f.confused -= 1;
+    if (f.confused === 0) {
+      showMessage(`${displayName(f)} snapped out of confusion!`);
+      paintConditions(f);
+      return false;
+    }
+    if (Math.random() >= 1 / 3) return false;
+    const damage = Combat.confusionDamage(f);
+    showMessage(`${displayName(f)} hurt itself in confusion!`);
+    blink(imgOf(f));
+    popup(f, damage, 'damage', 'Confused');
+    setHp(f, f.hp - damage);
+    return true;
+  }
+
+  function heal(f, amount, note = '') {
+    const healed = Math.min(amount, f.maxHp - f.hp);
+    glow(f);
+    popup(f, `+${healed}`, 'heal', note);
+    setHp(f, f.hp + healed);
+  }
+
+  function inflict(f, ailment) {
+    if (ailment === 'confusion') {
+      if (f.fainted || f.confused) return false;
+      f.confused = 2 + Math.floor(Math.random() * 4); // lasts 2–5 actions
+      popup(f, 'CNF', 'status');
+      showMessage(`${displayName(f)} became confused!`);
+    } else {
+      if (!Combat.canReceiveStatus(f, ailment)) return false;
+      f.status = ailment;
+      if (ailment === 'sleep') f.sleepTurns = 2 + Math.floor(Math.random() * 3); // sleeps through 1–3 turns
+      popup(f, STATUS_INFO[ailment].tag, 'status');
+      showMessage(`${displayName(f)} ${STATUS_INFO[ailment].text}`);
+      if (ailment === 'sleep' || ailment === 'freeze') interruptTurn(f);
+    }
+    paintConditions(f);
+    return true;
+  }
+
+  function cure(f, text) {
+    f.status = null;
+    f.sleepTurns = 0;
+    paintConditions(f);
+    if (text) showMessage(text);
+  }
+
+  function changeStats(f, changes) {
+    const applied = Combat.changeStages(f, changes);
+    if (!applied.length) return false;
+    const parts = applied.map(({ stat, delta }) => {
+      const label = STAT_LABELS[stat];
+      return delta ? `${label} ${(delta > 0 ? '↑' : '↓').repeat(Math.min(Math.abs(delta), 3))}` : `${label} max`;
+    });
+    popup(f, parts.join(' '), applied.some(a => a.delta > 0) ? 'buff' : 'debuff');
+    paintConditions(f);
+    return applied.some(a => a.delta !== 0);
+  }
+
+  function conditionSummary(f) {
+    const parts = [];
+    if (f.status) parts.push(STATUS_INFO[f.status].tag);
+    if (f.confused) parts.push('CNF');
+    Object.entries(f.stages).forEach(([stat, s]) => {
+      if (s) parts.push(`${STAT_LABELS[stat]} ${s > 0 ? '+' : '−'}${Math.abs(s)}`);
+    });
+    return parts.join(' · ');
+  }
+
+  // Status icon and glow on the sprite, tags and stat stages on the HUD row.
+  function paintConditions(f) {
+    const unit = unitOf(f);
+    Combat.STATUSES.forEach(s => unit.classList.toggle(`st-${s}`, f.status === s));
+    unit.querySelector('.unit-status').textContent = [STATUS_INFO[f.status]?.icon, f.confused ? '💫' : ''].filter(Boolean).join('');
+    const row = rowOf(f);
+    const tags = [f.status && STATUS_INFO[f.status].tag, f.confused && 'CNF'].filter(Boolean);
+    row.querySelector('.row-status').innerHTML = tags.map(t => `<i class="tag tag-${t.toLowerCase()}">${t}</i>`).join('');
+    row.querySelector('.row-stages').textContent = Object.entries(f.stages)
+      .filter(([, s]) => s)
+      .map(([stat, s]) => `${STAT_LABELS[stat]}${s > 0 ? '+' : ''}${s}`)
+      .join(' ');
+    row.title = conditionSummary(f);
+  }
+
+  function strike(attacker, target, move) {
     const result = Combat.calcDamage(attacker, target, move);
     if (result.missed) {
       popup(target, 'Miss', 'miss');
@@ -420,6 +732,7 @@
     shake(target);
     popup(target, damage, result.crit ? 'damage crit' : 'damage', notes.join(' · '));
     setHp(target, target.hp - damage);
+    applySecondary(attacker, target, move, damage);
   }
 
   // The shield bubble stays up while guard charges remain, fading as they're used.
@@ -442,10 +755,11 @@
       battle.pending.push(j);
       return;
     }
-    const target = pick(living(battle.party));
+    if (!startTurn(f)) return;
+    const move = chooseEnemyMove(f);
+    const scope = moveScope(move);
+    const target = scope === 'self' ? f : pick(living(battle.party));
     if (!target) return;
-    const usable = (f.moves || []).filter(m => m.category !== 'status');
-    const move = usable.length ? pick(usable) : TACKLE;
     const row = rowOf(f);
     showMessage(`Wild ${f.name} used ${move.name}!`);
     row.classList.add('acting');
@@ -458,14 +772,25 @@
         fillEnemyAtb(j, 0, recoveryFactor(move));
       },
     });
-    lunge(tl, unit, -1, () => strike(f, target, move));
+    if (scope === 'self') cast(tl, unit, () => resolveMove(f, f, move));
+    else lunge(tl, unit, -1, () => resolveMove(f, target, move));
     tl.to(innerOf(unit), { x: 0, duration: 0.3, ease: 'power2.inOut' });
+  }
+
+  // Wild Pokémon mostly attack, but sometimes use a status move that would actually do something.
+  function chooseEnemyMove(f) {
+    const moves = f.moves || [];
+    const attacks = moves.filter(m => m.category !== 'status');
+    const support = moves.filter(m => m.category === 'status' && statusMoveWorks(m) && !(m.healing && f.hp > f.maxHp / 2));
+    if (support.length && (!attacks.length || Math.random() < 0.3)) return pick(support);
+    return attacks.length ? pick(attacks) : TACKLE;
   }
 
   function faint(f) {
     f.fainted = true;
-    f.guards = 0;
+    Combat.clearConditions(f);
     showGuard(f);
+    paintConditions(f);
     const row = rowOf(f);
     const unit = unitOf(f);
     row.classList.add('fainted');
@@ -512,10 +837,14 @@
       showMessage(`${move.name} is out of PP!`);
       return;
     }
-    if (move.category === 'status') {
-      // Stat and status effects aren't modeled yet, so these just spend the turn.
+    const text = `${f.name} used ${move.name}!`;
+    const scope = moveScope(move);
+    // Only single-target moves need a target picked; self and all-foe moves go straight off.
+    if (scope !== 'foe') {
       move.ppLeft -= 1;
-      endTurn(`${f.name} used ${move.name}!`, recoveryFactor(move), tl => tl.add(() => popup(f, 'No effect', 'miss')).to({}, { duration: 0.5 }));
+      endTurn(text, recoveryFactor(move), (tl, unit) => (scope === 'foes'
+        ? lunge(tl, unit, 1, () => resolveMove(f, null, move))
+        : cast(tl, unit, () => resolveMove(f, f, move))));
       return;
     }
     beginTargeting({
@@ -523,7 +852,7 @@
       candidates: () => living(battle.enemies),
       onConfirm(target) {
         move.ppLeft -= 1;
-        endTurn(`${f.name} used ${move.name}!`, recoveryFactor(move), (tl, unit) => lunge(tl, unit, 1, () => strike(f, target, move)));
+        endTurn(text, recoveryFactor(move), (tl, unit) => lunge(tl, unit, 1, () => resolveMove(f, target, move)));
       },
     });
   }
@@ -531,6 +860,7 @@
   function itemTargets(item, user) {
     if (item.target === 'ally') return living(battle.party);
     if (item.target === 'fainted') return battle.party.filter(p => p.fainted);
+    if (item.target === 'afflicted') return living(battle.party).filter(p => p.status || p.confused);
     return [user];
   }
 
@@ -541,10 +871,12 @@
       : `Used ${article(item.name)} ${item.name} on ${target.name}!`;
     endTurn(text, RECOVERY.item, tl => tl.add(() => {
       if (item.heal) {
-        const healed = Math.min(item.heal, target.maxHp - target.hp);
+        heal(target, item.heal);
+      } else if (item.id === 'full-heal') {
+        target.confused = 0;
+        cure(target);
         glow(target);
-        popup(target, `+${healed}`, 'heal');
-        setHp(target, target.hp + healed);
+        popup(target, 'Cured', 'heal');
       } else if (item.id === 'revive') {
         if (!target.fainted) return;
         revive(target);
@@ -554,9 +886,8 @@
         glow(user);
         popup(user, 'PP +10', 'heal');
       } else if (item.id === 'x-attack') {
-        user.atkStage = Math.min(6, user.atkStage + 2);
         glow(user);
-        popup(user, 'Atk ↑↑', 'heal');
+        changeStats(user, [{ stat: 'attack', change: 2 }]);
       }
     }).to({}, { duration: 0.5 }));
   }
@@ -611,7 +942,8 @@
     unitOf(f).classList.add('targeted');
     rowOf(f).classList.add('targeted');
     const title = document.createElement('strong');
-    title.textContent = `${t.label} → ${displayName(f)}  (HP ${f.hp}/${f.maxHp})`;
+    const conditions = conditionSummary(f);
+    title.textContent = `${t.label} → ${displayName(f)}  (HP ${f.hp}/${f.maxHp}${conditions ? ` · ${conditions}` : ''})`;
     els.help.replaceChildren(title, 'Arrow keys or hover to switch target · Enter or click to confirm · Esc to cancel');
   }
 
@@ -688,6 +1020,7 @@
   function openCommand() {
     els.commandPanel.classList.add('engaged');
     els.command.classList.add('open');
+    positionPanel();
     gsap.fromTo(els.command, { opacity: 0, x: -12 }, { opacity: 1, x: 0, duration: 0.2, ease: 'power2.out' });
     focusItem(els.command);
   }
@@ -697,6 +1030,7 @@
     setPaused(true);
     menu.classList.add('open');
     els.commandPanel.classList.add('expanded');
+    positionPanel();
     els.help.classList.add('open');
     els.help.textContent = '';
     gsap.fromTo(menu, { opacity: 0, x: 16 }, { opacity: 1, x: 0, duration: 0.2, ease: 'power2.out' });
@@ -708,6 +1042,7 @@
     if (!open) return false;
     open.classList.remove('open');
     els.commandPanel.classList.remove('expanded');
+    positionPanel();
     els.help.classList.remove('open');
     setPaused(false);
     const action = open === els.attackMenu ? 'attack' : 'items';
@@ -737,7 +1072,8 @@
       const meta = [
         capitalize(m.type), capitalize(m.category), `Power ${m.power ?? '—'}`,
         `Acc ${m.accuracy ? `${m.accuracy}%` : '—'}`, `ATB refill ×${factor.toFixed(2)}`,
-      ].join(' · ');
+        m.category === 'status' && !statusMoveWorks(m) ? 'No effect in battle yet' : '',
+      ].filter(Boolean).join(' · ');
       return `
         <button type="button" class="menu-item move${m.ppLeft <= 0 ? ' disabled' : ''}" role="menuitem"
           data-action="move" data-index="${index}" data-meta="${attr(`${m.name} — ${meta}`)}" data-help="${attr(m.effect)}">
@@ -800,6 +1136,10 @@
       els.music.click();
       return;
     }
+    if (action === 'y') {
+      toggleView();
+      return;
+    }
     if (battle.targeting) {
       if (action === 'up' || action === 'left') cycleTarget(-1);
       else if (action === 'down' || action === 'right') cycleTarget(1);
@@ -834,7 +1174,7 @@
       const t = battle.targeting;
       if (f && t && f !== t.target && t.candidates().includes(f)) markTarget(f);
     };
-    for (const el of [els.units, els.partyRows, els.enemyRows]) {
+    for (const el of [els.units, els.partyRows, els.enemyRows, els.plates]) {
       el.addEventListener('click', onFighterClick);
       el.addEventListener('mouseover', onFighterHover);
     }
@@ -901,7 +1241,15 @@
       Music.toggle();
       updateMusicButton();
     });
+    els.viewBtn.addEventListener('click', toggleView);
+    document.addEventListener('keydown', e => {
+      if ((e.key === 'v' || e.key === 'V') && !e.ctrlKey && !e.metaKey && !e.altKey) toggleView();
+    });
     updateMusicButton();
+  }
+
+  function toggleView() {
+    if (battle.party.length) setView(isAdvanced() ? 'traditional' : 'advanced');
   }
 
   function updateMusicButton() {
@@ -964,6 +1312,7 @@
       // Landing hop
       .to(inners(battle.units), { y: -18, duration: 0.15, stagger: 0.12, yoyo: true, repeat: 1, ease: 'power2.out' }, '>-0.1')
       .from(els.hud, { yPercent: 110, duration: 0.5, ease: 'power3.out' }, 1.1)
+      .from(els.plates, { opacity: 0, duration: 0.4 }, 1.1)
       .add(() => showMessage(`Wild ${names.slice(0, -1).join(', ')} and ${names.at(-1)} appeared!`), 1.2)
       .add(() => {
         battle.party.forEach((_, i) => fillPartyAtb(i, rand(0, 0.35)));
@@ -1002,6 +1351,9 @@
       ...battle.enemies.map(f => loadSprite(imgOf(f), f.id)),
     ]);
     els.loading.remove();
+    let view = 'traditional';
+    try { view = localStorage.getItem(VIEW_KEY) === 'advanced' ? 'advanced' : 'traditional'; } catch { /* default */ }
+    setView(view);
     playIntro();
   }
 
@@ -1010,7 +1362,7 @@
   let resizeTimer;
   addEventListener('resize', () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => els.units.querySelectorAll('img').forEach(sizeSprite), 100);
+    resizeTimer = setTimeout(relayout, 100);
   });
 
   init();

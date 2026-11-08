@@ -186,6 +186,32 @@ img { image-rendering: pixelated; }
   visibility: hidden;
 }
 .unit.active .unit-cursor { visibility: visible; }
+/* Status conditions: an icon over the sprite plus a tint/glow. */
+.unit-status {
+  position: absolute;
+  top: -4px;
+  right: -10px;
+  z-index: 3;
+  font-size: 18px;
+  line-height: 1;
+  filter: drop-shadow(1px 1px 0 #000);
+  animation: status-bob 1s ease-in-out infinite;
+  pointer-events: none;
+}
+.unit-status:empty { display: none; }
+@keyframes status-bob { 50% { translate: 0 -4px; } }
+.unit.st-burn .unit-inner { filter: drop-shadow(0 0 6px rgba(255, 120, 40, 0.9)); }
+.unit.st-poison .unit-inner { filter: drop-shadow(0 0 6px rgba(180, 90, 255, 0.95)); }
+.unit.st-sleep .unit-inner { filter: brightness(0.75) saturate(0.7); }
+.unit.st-freeze .unit-inner { filter: saturate(0.25) brightness(1.3) drop-shadow(0 0 8px rgba(150, 230, 255, 0.95)); }
+.unit.st-paralysis .unit-inner { animation: paralyzed 1.4s steps(1) infinite; }
+@keyframes paralyzed {
+  0%, 70% { filter: drop-shadow(0 0 5px rgba(255, 220, 60, 0.8)); }
+  75% { filter: drop-shadow(0 0 10px #ffe94d) brightness(1.4); }
+  85% { filter: drop-shadow(0 0 5px rgba(255, 220, 60, 0.8)); }
+  90% { filter: drop-shadow(0 0 10px #ffe94d) brightness(1.4); }
+}
+
 .unit.defending .unit-shield { opacity: 0.45; }
 .unit.defending[data-guards='1'] .unit-shield { opacity: 0.25; }
 
@@ -234,6 +260,10 @@ body.targeting .unit, body.targeting .enemy-row { cursor: pointer; }
 .popup.crit b { font-size: 26px; color: #ffe066; }
 .popup.heal b { color: #7dff9a; }
 .popup.miss b { font-size: 14px; color: #cfd6ff; }
+.popup.status b { font-size: 15px; color: #ff9ad5; }
+.popup.buff b, .popup.debuff b { font-size: 12px; line-height: 1.6; }
+.popup.buff b { color: #8fd3ff; }
+.popup.debuff b { color: #ffb36b; }
 
 /* ---------- Overlays on the field ---------- */
 
@@ -251,17 +281,21 @@ body.targeting .unit, body.targeting .enemy-row { cursor: pointer; }
 .back-btn:hover { filter: brightness(1.25); }
 .back-btn:focus-visible { outline: 3px solid #ffe066; outline-offset: 3px; }
 
-.music-btn {
+.top-buttons {
   position: absolute;
   top: 12px;
   right: 12px;
   z-index: 200;
+  display: flex;
+  gap: 8px;
+}
+.top-btn {
   padding: 8px 14px;
   font: 600 14px 'Rubik', system-ui, sans-serif;
   cursor: pointer;
   transition: filter 0.15s;
 }
-.music-btn:hover { filter: brightness(1.25); }
+.top-btn:hover { filter: brightness(1.25); }
 
 /* Button guide, shown only while a controller is connected. */
 .pad-legend {
@@ -296,8 +330,59 @@ body.targeting .unit, body.targeting .enemy-row { cursor: pointer; }
 }
 .pad-btn.a { background: #3fae4f; }
 .pad-btn.b { background: #d8434f; }
-.music-btn:focus-visible { outline: 3px solid #ffe066; outline-offset: 3px; }
+.pad-btn.y { background: #d4a514; }
+.top-btn:focus-visible { outline: 3px solid #ffe066; outline-offset: 3px; }
 .music-btn[aria-pressed='false'] { color: #9aa2cc; }
+
+/* ---------- Advanced view: no bottom panel, info floats over each Pokémon ---------- */
+
+.view-advanced .hud { display: none; }
+.plates { position: absolute; inset: 0; z-index: 120; display: none; pointer-events: none; }
+.view-advanced .plates { display: block; }
+
+/* Anchored at the top-centre of the sprite, lifted to leave room for the cursor arrow (PLATE_LIFT in battle.js). */
+.plate {
+  position: absolute;
+  width: 148px;
+  translate: -50% calc(-100% - 30px);
+  pointer-events: auto;
+}
+.plate .unit-row {
+  width: 100%;
+  margin: 0;
+  padding: 5px 8px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(8, 12, 44, 0.72);
+  backdrop-filter: blur(2px);
+  font-size: 13px;
+  text-shadow: 1px 1px 0 var(--win-ink);
+}
+.plate .unit-grid { grid-template-columns: 1fr; gap: 3px; }
+.plate .row-hp { gap: 2px; }
+.plate .row-hp .num { font-size: 11px; }
+.plate .row-hp .num b { font-size: 12px; }
+.plate .bar { height: 5px; }
+.plate .bar.atb { height: 6px; }
+.plate .party-row:hover { background: rgba(30, 40, 100, 0.85); }
+.plate .party-row.ready { border-color: #ffe066; }
+.plate .party-row.active { background: rgba(40, 52, 130, 0.9); box-shadow: 0 0 0 2px #ffe066; }
+.plate .party-row.active::before { display: none; }
+.plate .unit-row.targeted { box-shadow: 0 0 0 2px #ff5d73; }
+.plate .unit-row.fainted { opacity: 0.4; }
+
+/* The command menu pops up beside the active Pokémon (placed by battle.js). */
+.view-advanced .command-panel {
+  position: absolute;
+  z-index: 130;
+  width: 180px;
+  height: 152px;
+  padding: 0;
+  transition: left 0.18s ease-out, top 0.18s ease-out;
+}
+.view-advanced .command-panel:not(.engaged) { display: none; }
+.view-advanced .command-panel.expanded { width: min(340px, calc(100% - 16px)); height: min(290px, calc(100% - 70px)); }
+.view-advanced .command-hint { display: none; }
 
 .message {
   position: absolute;
@@ -405,6 +490,24 @@ body.targeting .unit, body.targeting .enemy-row { cursor: pointer; }
 .row-guard { margin-left: 6px; font-size: 12px; color: #a8dcff; }
 .row-hp { display: grid; gap: 3px; }
 .row-hp .num { font-variant-numeric: tabular-nums; font-size: 14px; }
+.num-line { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; }
+.row-status { display: inline-flex; gap: 3px; }
+.row-stages { font-size: 11px; color: var(--label); overflow: hidden; text-overflow: ellipsis; }
+.tag {
+  padding: 1px 5px;
+  border-radius: 4px;
+  font: 700 9px 'Rubik', system-ui, sans-serif;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: none;
+}
+.tag-brn { background: #e2622a; }
+.tag-psn { background: #9b4fd1; }
+.tag-par { background: #d4b21c; color: #2a2300; }
+.tag-slp { background: #6f7894; }
+.tag-frz { background: #4fb8d8; }
+.tag-cnf { background: #d6609a; }
 .row-hp .num b { font-size: 16px; }
 
 .bar {
@@ -638,5 +741,9 @@ body.targeting .pane.open { opacity: 0.55; }
   .hud > .command-panel.expanded { width: calc(100% - 12px); height: 45vh; }
   .help { top: 58px; width: calc(100% - 32px); }
   .message { top: 58px; max-width: calc(100% - 32px); font-size: 14px; }
-  .back-btn, .music-btn { font-size: 13px; padding: 6px 12px; }
+  .back-btn, .top-btn { font-size: 13px; padding: 6px 12px; }
+  .top-buttons { flex-direction: column; align-items: flex-end; gap: 6px; }
+  .plate { width: 116px; }
+  .plate .unit-row { font-size: 11px; padding: 4px 6px; }
+  .plate .row-stages { display: none; }
 }

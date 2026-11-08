@@ -142,6 +142,15 @@ const PokeAPI = (() => {
           accuracy: m.accuracy,
           pp: m.pp,
           effect: cleanText(m.flavor_text_entries.findLast(e => e.language.name === 'en')?.flavor_text),
+          // Who it affects and what it does besides damage (status, stat changes, healing, drain/recoil).
+          target: m.target.name,
+          ailment: m.meta?.ailment?.name || 'none',
+          ailmentChance: m.meta?.ailment_chance || 0,
+          statChanges: m.stat_changes.map(s => ({ stat: s.stat.name, change: s.change })),
+          statChance: m.meta?.stat_chance || 0,
+          effectCategory: m.meta?.category?.name || '',
+          healing: m.meta?.healing || 0,
+          drain: m.meta?.drain || 0,
         }))
         .catch(err => {
           moveCache.delete(name);
