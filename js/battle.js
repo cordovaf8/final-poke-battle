@@ -238,6 +238,7 @@
         <span class="unit-shadow"></span>
         <span class="unit-shield"></span>
         <span class="unit-status"></span>
+        <span class="unit-types">${f.types.map(typeBadge).join('')}</span>
         <img class="unit-sprite" alt="${f.name}">
       </div>`;
     return unit;
@@ -277,6 +278,7 @@
     return `
       <${open} class="unit-row ${f.side}-row unit-grid" data-i="${f.index}">
         <span class="row-name">${f.name}<span class="row-guard"></span></span>
+        <span class="row-types">${f.types.map(typeBadge).join('')}</span>
         <span class="row-hp">
           <span class="num-line">
             <span class="num"><b>${f.hp}</b>/${f.maxHp}</span>
@@ -321,8 +323,14 @@
         (f.side === 'party' ? els.partyRows : els.enemyRows).appendChild(f.row);
       }
     }
-    if (isAdvanced()) els.field.appendChild(els.commandPanel);
-    else els.hud.insertBefore(els.commandPanel, els.enemyWindow);
+    if (isAdvanced()) {
+      els.field.appendChild(els.commandPanel);
+    } else {
+      // Drop the floating position, or it would shift the panel out of its slot in the bottom bar.
+      els.commandPanel.style.left = '';
+      els.commandPanel.style.top = '';
+      els.hud.insertBefore(els.commandPanel, els.enemyWindow);
+    }
     relayout();
   }
 
@@ -796,6 +804,7 @@
     row.classList.add('fainted');
     row.classList.remove('ready', 'active', 'acting');
     unit.classList.remove('active');
+    unit.classList.add('fainted');
     drainAtb(row);
     showMessage(`${displayName(f)} fainted!`);
 
@@ -821,6 +830,7 @@
 
   function revive(f) {
     f.fainted = false;
+    unitOf(f).classList.remove('fainted');
     rowOf(f).classList.remove('fainted');
     gsap.to(imgOf(f), { filter: 'grayscale(0) brightness(1)', opacity: 1, duration: 0.5, clearProps: 'filter' });
     setHp(f, Math.floor(f.maxHp / 2));
@@ -1351,8 +1361,9 @@
       ...battle.enemies.map(f => loadSprite(imgOf(f), f.id)),
     ]);
     els.loading.remove();
-    let view = 'traditional';
-    try { view = localStorage.getItem(VIEW_KEY) === 'advanced' ? 'advanced' : 'traditional'; } catch { /* default */ }
+    // Advanced is the default; Traditional only if the player picked it before.
+    let view = 'advanced';
+    try { view = localStorage.getItem(VIEW_KEY) === 'traditional' ? 'traditional' : 'advanced'; } catch { /* default */ }
     setView(view);
     playIntro();
   }

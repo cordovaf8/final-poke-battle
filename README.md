@@ -41,7 +41,7 @@ Cards that would break a rule are dimmed, and hovering one shows the reason. Pre
 
 ### 2. Battle
 
-Your team is on the left and the wild Pokémon are on the right. Every Pokémon has an **ATB gauge** that fills in real time based on its Speed. Wild Pokémon act on their own as soon as their gauge fills.
+Your team is on the left and the wild Pokémon are on the right, with each Pokémon's types shown above it so you can plan matchups at a glance. Every Pokémon has an **ATB gauge** that fills in real time based on its Speed. Wild Pokémon act on their own as soon as their gauge fills.
 
 - **Take command:** when a gauge is full, the Pokémon's name turns gold. Click its row or its sprite to command it. The first ready Pokémon is selected automatically, and you can switch between ready Pokémon without losing a turn.
 - **Commands:**
@@ -50,8 +50,8 @@ Your team is on the left and the wild Pokémon are on the right. Every Pokémon 
   - **Defend:** guard the next 2 hits.
 - **ATB pauses while the Attack or Items list is open**, so you can choose without being rushed.
 - **Two views:** switch any time with the **View** button (top right), the **V** key or **Y** on a controller. Your choice is remembered.
+  - **Advanced** (default): the bottom panel is gone and the battlefield fills the screen. Each Pokémon has a small floating nameplate (name, HP, status, ATB), and the command menu pops up right next to the Pokémon you're commanding, so your eyes stay on the action.
   - **Traditional:** classic layout with your team, commands and the wild Pokémon in a panel along the bottom.
-  - **Advanced:** the bottom panel is gone and the battlefield fills the screen. Each Pokémon has a small floating nameplate (name, HP, status, ATB), and the command menu pops up right next to the Pokémon you're commanding, so your eyes stay on the action.
 - Win by making all three wild Pokémon faint. Lose if your whole team does.
 
 ### Controls
