@@ -262,6 +262,40 @@ body.targeting .unit, body.targeting .enemy-row { cursor: pointer; }
   transition: filter 0.15s;
 }
 .music-btn:hover { filter: brightness(1.25); }
+
+/* Button guide, shown only while a controller is connected. */
+.pad-legend {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 140;
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  max-width: calc(100% - 24px);
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(5, 8, 30, 0.75);
+  font-size: 12px;
+  font-weight: 600;
+}
+.has-gamepad .pad-legend { display: flex; }
+.pad-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.pad-btn {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: #3a4070;
+  color: #fff;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+}
+.pad-btn.a { background: #3fae4f; }
+.pad-btn.b { background: #d8434f; }
 .music-btn:focus-visible { outline: 3px solid #ffe066; outline-offset: 3px; }
 .music-btn[aria-pressed='false'] { color: #9aa2cc; }
 

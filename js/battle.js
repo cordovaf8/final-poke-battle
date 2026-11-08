@@ -767,6 +767,60 @@
 
   // ---------- Input ----------
 
+  // Arrow-key style movement inside a menu list (two-column lists move sideways too).
+  function moveInMenu(item, key) {
+    const list = item.closest('.menu-list');
+    const cols = getComputedStyle(list).gridTemplateColumns.split(' ').length;
+    const step = { ArrowUp: -cols, ArrowDown: cols, ArrowLeft: cols > 1 ? -1 : 0, ArrowRight: cols > 1 ? 1 : 0 }[key];
+    if (step == null) return false;
+    const items = [...list.querySelectorAll('.menu-item')];
+    select(items[items.indexOf(item) + step]);
+    return true;
+  }
+
+  // LB/RB: hand command to the previous/next Pokémon whose gauge is full.
+  function cycleCommand(step) {
+    const ready = [...battle.ready].sort((a, b) => a - b);
+    if (!ready.length) return;
+    const index = ready.indexOf(battle.active);
+    activate(ready[index < 0 ? 0 : (index + step + ready.length) % ready.length]);
+  }
+
+  const PAD_KEYS = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
+
+  function onPad(action) {
+    if (!els.result.hidden) {
+      const buttons = [...els.result.querySelectorAll('.win-btn')];
+      const index = Math.max(0, buttons.indexOf(document.activeElement));
+      if (action === 'left' || action === 'right') buttons[(index + 1) % buttons.length].focus();
+      else if (action === 'confirm' || action === 'start') buttons[index].click();
+      return;
+    }
+    if (action === 'select') {
+      els.music.click();
+      return;
+    }
+    if (battle.targeting) {
+      if (action === 'up' || action === 'left') cycleTarget(-1);
+      else if (action === 'down' || action === 'right') cycleTarget(1);
+      else if (action === 'confirm') confirmTarget(battle.targeting.target);
+      else if (action === 'back') cancelTargeting();
+      return;
+    }
+    if (action === 'prev' || action === 'next') {
+      cycleCommand(action === 'next' ? 1 : -1);
+      return;
+    }
+    if (action === 'back') {
+      closeSubmenu();
+      return;
+    }
+    const item = currentItem();
+    if (!item) return;
+    if (action === 'confirm') item.click();
+    else if (PAD_KEYS[action]) moveInMenu(item, PAD_KEYS[action]);
+  }
+
   function bindControls() {
     // Sprites and HUD rows: pick a target while targeting, otherwise take command of a party member.
     const onFighterClick = e => {
@@ -837,14 +891,9 @@
         item.click();
         return;
       }
-      const list = item.closest('.menu-list');
-      const cols = getComputedStyle(list).gridTemplateColumns.split(' ').length;
-      const step = { ArrowUp: -cols, ArrowDown: cols, ArrowLeft: cols > 1 ? -1 : 0, ArrowRight: cols > 1 ? 1 : 0 }[e.key];
-      if (step == null) return;
-      e.preventDefault();
-      const items = [...list.querySelectorAll('.menu-item')];
-      select(items[items.indexOf(item) + step]);
+      if (moveInMenu(item, e.key)) e.preventDefault();
     });
+    Gamepad.on(onPad);
 
     els.command.querySelectorAll('.pointer').forEach(bobPointer);
     els.againBtn.addEventListener('click', () => location.reload());

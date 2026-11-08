@@ -648,7 +648,74 @@
 
   // ---------- Events ----------
 
+  // ---------- Controller ----------
+
+  function focusCard(card) {
+    els.grid.querySelector('.pad-focus')?.classList.remove('pad-focus');
+    card.classList.add('pad-focus');
+    card.focus({ preventScroll: true });
+    card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    hop(card.querySelector('img'));
+    previewSoon(Number(card.dataset.id));
+  }
+
+  // Moves the controller highlight around the card grid; the first press just lands on a card.
+  function moveCardFocus(dir) {
+    const cards = [...els.grid.children];
+    if (!cards.length) return;
+    let index = cards.findIndex(c => c.classList.contains('pad-focus'));
+    if (index < 0) {
+      index = Math.max(0, cards.indexOf(document.activeElement));
+    } else {
+      const firstRowEnd = cards.findIndex(c => c.offsetTop !== cards[0].offsetTop);
+      const cols = firstRowEnd < 0 ? cards.length : firstRowEnd;
+      const step = { left: -1, right: 1, up: -cols, down: cols }[dir];
+      index = gsap.utils.clamp(0, cards.length - 1, index + step);
+    }
+    focusCard(cards[index]);
+  }
+
+  function switchGen(step) {
+    const tabs = [...els.gens.querySelectorAll('.gen')];
+    const index = tabs.findIndex(t => t.classList.contains('active'));
+    tabs[(index + step + tabs.length) % tabs.length].click();
+  }
+
+  function onPad(action) {
+    if (!els.overlay.hidden) {
+      if (action === 'back') hideOverlay();
+      else if (action === 'confirm' || action === 'start') goToBattle();
+      return;
+    }
+    if (els.detail.classList.contains('open')) {
+      // Phone layout info sheet.
+      if (action === 'confirm') els.add.click();
+      else if (action === 'back') closeSheet();
+      return;
+    }
+    switch (action) {
+      case 'up': case 'down': case 'left': case 'right':
+        moveCardFocus(action);
+        break;
+      case 'confirm':
+        els.grid.querySelector('.card.pad-focus')?.click();
+        break;
+      case 'back': {
+        const last = state.team.at(-1);
+        if (last) removeFromTeam(last.id);
+        break;
+      }
+      case 'x': randomTeam(); break;
+      case 'prev': switchGen(-1); break;
+      case 'next': switchGen(1); break;
+      case 'start': if (!els.confirm.disabled) confirmTeam(); break;
+      case 'select': els.music.click(); break;
+    }
+  }
+
   function bindEvents() {
+    Gamepad.on(onPad);
+
     let lastHover = null;
     els.grid.addEventListener('mouseover', e => {
       const card = e.target.closest('.card');

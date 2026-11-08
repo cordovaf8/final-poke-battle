@@ -51,14 +51,32 @@ Your team is on the left and the wild Pokémon are on the right. Every Pokémon 
 - **ATB pauses while the Attack or Items list is open**, so you can choose without being rushed.
 - Win by making all three wild Pokémon faint. Lose if your whole team does.
 
-Controls:
+### Controls
 
-| Action | Mouse | Keyboard |
+Mouse, keyboard and game controllers all work. Controllers use the standard Xbox layout (on PlayStation, A = ✕, B = ○, X = □), and a button guide appears on screen once a controller is detected. Browsers only detect a controller after you press one of its buttons on the page.
+
+**Team select**
+
+| Action | Mouse | Controller |
 | --- | --- | --- |
-| Move the menu cursor | Hover | Arrow keys |
-| Choose | Click | Enter / Space |
-| Switch target | Hover a sprite or row | Arrow keys |
-| Back / cancel | ◀ button or right-click | Esc / Backspace |
+| Move between Pokémon | Hover | D-pad / left stick |
+| Add / remove a Pokémon | Click | A |
+| Remove the last pick | Click its slot | B |
+| Random team | Random button | X |
+| Previous / next generation | Generation tabs | LB / RB |
+| Confirm team | Confirm button | Start |
+| Music on/off | ♪ button | Select |
+
+**Battle**
+
+| Action | Mouse | Keyboard | Controller |
+| --- | --- | --- | --- |
+| Command a ready Pokémon | Click its row or sprite | (automatic) | LB / RB |
+| Move the menu cursor | Hover | Arrow keys | D-pad / left stick |
+| Choose | Click | Enter / Space | A |
+| Switch target | Hover a sprite or row | Arrow keys | D-pad / left stick |
+| Back / cancel | ◀ button or right-click | Esc / Backspace | B |
+| Music on/off | Music button | | Select |
 
 ## Battle mechanics
 
@@ -104,6 +122,7 @@ js/app.js        Team select logic and team rules
 js/combat.js     Battle math: stats, type chart, damage, Defend
 js/battle.js     Battle flow: ATB, menus, targeting, animation
 js/music.js      Chiptune synth, sequencer and the soundtrack
+js/gamepad.js    Controller input (Gamepad API)
 ```
 
 The confirmed team is saved in `localStorage` under `pokemonTeam`, and the select screen fires a `team:confirmed` event. Opening `battle.html` directly with no saved team gives you a random party.
