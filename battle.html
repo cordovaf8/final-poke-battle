@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Battle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/battle.css">
+</head>
+<body>
+  <div class="screen" id="screen">
+    <div class="field" id="field">
+      <div class="sky"></div>
+      <div class="backdrop" id="backdrop"></div>
+      <div class="ground"></div>
+      <div class="rays"></div>
+      <div class="frame" id="frame"></div>
+      <div class="motes" id="motes"></div>
+      <div class="units" id="units"></div>
+
+      <a class="back-btn window" href="index.html">&larr; Team select</a>
+      <div class="message window" id="message"></div>
+      <div class="help window" id="help"></div>
+      <p class="loading" id="loading">Encountering wild Pokémon<span class="dots"></span></p>
+    </div>
+
+    <div class="hud" id="hud">
+      <section class="window side-window party-window">
+        <header class="hud-head unit-grid"><span>Your team</span><span>HP</span><span>ATB</span></header>
+        <div class="unit-rows" id="partyRows"></div>
+      </section>
+
+      <section class="window command-panel" id="commandPanel">
+        <p class="command-hint"><span>Click a Pokémon with a full <b>ATB</b> gauge to command it</span></p>
+
+        <nav class="pane command" id="command" aria-label="Commands">
+          <header class="hud-head"><span id="commandTitle">Command</span></header>
+          <div class="menu-list" role="menu">
+            <button type="button" class="menu-item" role="menuitem" data-action="attack">Attack</button>
+            <button type="button" class="menu-item" role="menuitem" data-action="items">Items</button>
+            <button type="button" class="menu-item" role="menuitem" data-action="defend">Defend</button>
+            <span class="pointer"></span>
+          </div>
+        </nav>
+
+        <section class="pane submenu" id="attackMenu" aria-label="Attacks">
+          <header class="hud-head"><button type="button" class="sub-back" aria-label="Back to commands">&#9664;</button><span>Attacks</span><span>Pwr&nbsp;&nbsp;PP</span></header>
+          <div class="menu-list moves" id="moveList" role="menu"></div>
+        </section>
+
+        <section class="pane submenu" id="itemMenu" aria-label="Items">
+          <header class="hud-head"><button type="button" class="sub-back" aria-label="Back to commands">&#9664;</button><span>Items</span><span>Qty</span></header>
+          <div class="menu-list" id="itemList" role="menu"></div>
+        </section>
+      </section>
+
+      <section class="window side-window enemy-window">
+        <header class="hud-head unit-grid"><span>Wild Pokémon</span><span>HP</span><span>ATB</span></header>
+        <div class="unit-rows" id="enemyRows"></div>
+      </section>
+    </div>
+
+    <div class="result" id="result" hidden>
+      <div class="window result-card" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+        <h2 id="resultTitle"></h2>
+        <p id="resultText"></p>
+        <div class="result-actions">
+          <button type="button" class="win-btn" id="againBtn">Battle again</button>
+          <a class="win-btn" href="index.html">Team select</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="flash" id="flash"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/combat.js"></script>
+  <script src="js/battle.js"></script>
+</body>
+</html>
