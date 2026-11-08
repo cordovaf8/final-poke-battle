@@ -13,7 +13,7 @@
   const $ = sel => document.querySelector(sel);
   const els = {
     topbar: $('.topbar'), team: $('#team'), slots: [...document.querySelectorAll('.slot')],
-    random: $('#randomBtn'), mute: $('#muteBtn'), confirm: $('#confirmBtn'),
+    random: $('#randomBtn'), mute: $('#muteBtn'), music: $('#musicBtn'), confirm: $('#confirmBtn'),
     search: $('#search'), typeFilter: $('#typeFilter'), gens: $('#gens'), status: $('#status'), grid: $('#grid'),
     detail: $('#detail'), detailClose: $('#detailClose'), sheetBackdrop: $('#sheetBackdrop'),
     sprite: $('#detailSprite'), num: $('#detailNum'), name: $('#detailName'), genus: $('#detailGenus'),
@@ -166,6 +166,12 @@
   function updateMute() {
     els.mute.setAttribute('aria-pressed', String(state.muted));
     els.mute.setAttribute('aria-label', state.muted ? 'Unmute cries' : 'Mute cries');
+  }
+
+  function updateMusicButton() {
+    const on = Music.isEnabled();
+    els.music.setAttribute('aria-pressed', String(on));
+    els.music.setAttribute('aria-label', on ? 'Turn music off' : 'Turn music on');
   }
 
   // ---------- Grid ----------
@@ -710,6 +716,10 @@
       store.set(STORAGE.muted, state.muted);
       updateMute();
     });
+    els.music.addEventListener('click', () => {
+      Music.toggle();
+      updateMusicButton();
+    });
 
     document.addEventListener('keydown', e => {
       if (e.key !== 'Escape') return;
@@ -751,7 +761,10 @@
   renderStatRows();
   state.muted = store.get(STORAGE.muted, false);
   updateMute();
+  updateMusicButton();
   updateConfirm();
   bindEvents();
+  // Browsers hold audio until the first click or key press, so the theme starts then if it can't autoplay.
+  Music.play('menu');
   loadData();
 })();

@@ -73,6 +73,7 @@ img { image-rendering: pixelated; }
 .btn.icon { padding: 9px 11px; }
 #muteBtn .icon-off, #muteBtn[aria-pressed='true'] .icon-on { display: none; }
 #muteBtn[aria-pressed='true'] .icon-off { display: block; }
+.music-toggle[aria-pressed='false'] .icon-on, .music-toggle[aria-pressed='true'] .icon-off { display: none; }
 
 .link { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; }
 

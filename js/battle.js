@@ -27,6 +27,7 @@
     command: $('#command'), commandTitle: $('#commandTitle'), attackMenu: $('#attackMenu'),
     moveList: $('#moveList'), itemMenu: $('#itemMenu'), itemList: $('#itemList'), flash: $('#flash'),
     result: $('#result'), resultTitle: $('#resultTitle'), resultText: $('#resultText'), againBtn: $('#againBtn'),
+    music: $('#musicBtn'),
   };
 
   // party / enemies hold fighters (see Combat.createFighter). ready: party indexes with a full gauge, in fill order.
@@ -847,6 +848,17 @@
 
     els.command.querySelectorAll('.pointer').forEach(bobPointer);
     els.againBtn.addEventListener('click', () => location.reload());
+    els.music.addEventListener('click', () => {
+      Music.toggle();
+      updateMusicButton();
+    });
+    updateMusicButton();
+  }
+
+  function updateMusicButton() {
+    const on = Music.isEnabled();
+    els.music.setAttribute('aria-pressed', String(on));
+    els.music.textContent = on ? '♫ Music on' : '♫ Music off';
   }
 
   // ---------- Battle end ----------
@@ -864,6 +876,7 @@
     battle.ready = [];
     document.querySelectorAll('.atb i').forEach(fill => gsap.killTweensOf(fill));
     document.querySelectorAll('.unit-row').forEach(row => row.classList.remove('ready', 'active'));
+    Music.play(won ? 'victory' : 'defeat');
     gsap.delayedCall(1.5, () => showResult(won));
   }
 
@@ -888,6 +901,8 @@
   function playIntro() {
     const names = battle.enemies.map(f => f.name);
     const inners = list => list.map(innerOf);
+    // Starts with the encounter flash (or on the first click if the browser blocked autoplay).
+    Music.play('battle');
 
     gsap.timeline()
       // Encounter flash

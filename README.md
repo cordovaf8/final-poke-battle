@@ -2,7 +2,7 @@
 
 A browser fan game that mixes Pokémon with a classic side-view, real-time **ATB** battle system. Pick a team of three, then fight three random wild Pokémon in real time.
 
-Built with plain HTML, CSS and JavaScript, [GSAP](https://gsap.com/) for animation, and live data and sprites from [PokéAPI](https://pokeapi.co/).
+Built with plain HTML, CSS and JavaScript, [GSAP](https://gsap.com/) for animation, and live data and sprites from [PokéAPI](https://pokeapi.co/). The soundtrack is original chiptune music, synthesized live in the browser with the Web Audio API, so there are no audio files.
 
 > Personal, non-commercial fan project. Pokémon and all related names and artwork are © Nintendo, Game Freak and The Pokémon Company.
 
@@ -18,6 +18,8 @@ No build step and nothing to install.
   ```
 
 An internet connection is needed, since Pokémon data, sprites and cries are loaded from PokéAPI. The Pokédex list and stat totals are cached in `localStorage` after the first visit.
+
+**Music:** the team select screen plays a menu theme, and battles have their own theme plus victory and defeat jingles. Browsers block audio until you interact with the page, so the music starts on your first click or key press. Use the ♪ button (team select) or **Music on/off** (battle) to toggle it. The setting is remembered.
 
 ## How to play
 
@@ -101,6 +103,7 @@ js/api.js        PokéAPI requests, caching, sprites and learnsets
 js/app.js        Team select logic and team rules
 js/combat.js     Battle math: stats, type chart, damage, Defend
 js/battle.js     Battle flow: ATB, menus, targeting, animation
+js/music.js      Chiptune synth, sequencer and the soundtrack
 ```
 
 The confirmed team is saved in `localStorage` under `pokemonTeam`, and the select screen fires a `team:confirmed` event. Opening `battle.html` directly with no saved team gives you a random party.

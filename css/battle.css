@@ -251,6 +251,20 @@ body.targeting .unit, body.targeting .enemy-row { cursor: pointer; }
 .back-btn:hover { filter: brightness(1.25); }
 .back-btn:focus-visible { outline: 3px solid #ffe066; outline-offset: 3px; }
 
+.music-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 200;
+  padding: 8px 14px;
+  font: 600 14px 'Rubik', system-ui, sans-serif;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.music-btn:hover { filter: brightness(1.25); }
+.music-btn:focus-visible { outline: 3px solid #ffe066; outline-offset: 3px; }
+.music-btn[aria-pressed='false'] { color: #9aa2cc; }
+
 .message {
   position: absolute;
   top: 12px;
@@ -590,5 +604,5 @@ body.targeting .pane.open { opacity: 0.55; }
   .hud > .command-panel.expanded { width: calc(100% - 12px); height: 45vh; }
   .help { top: 58px; width: calc(100% - 32px); }
   .message { top: 58px; max-width: calc(100% - 32px); font-size: 14px; }
-  .back-btn { font-size: 13px; padding: 6px 12px; }
+  .back-btn, .music-btn { font-size: 13px; padding: 6px 12px; }
 }
