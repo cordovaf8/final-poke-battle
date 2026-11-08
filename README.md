@@ -82,6 +82,24 @@ Mouse, keyboard and game controllers all work. Controllers use the standard Xbox
 | Music on/off | Music button | | Select |
 | Switch view | View button | V | Y |
 
+### 3. Battle Tower
+
+After confirming your team, choose **Wild battle** for a quick fight against three random Pokémon, or **Battle Tower** to climb four floors of trainer battles.
+
+| Floor | Trainer | Foe strength (BST) | Foe speed |
+| --- | --- | --- | --- |
+| I · The Gate | Gatekeeper Rowan | 300–430 | slowest |
+| II · The Hall | Ace Trainer Mira | 420–500 | faster |
+| III · The Spire | Veteran Holt | 490–560 | faster still |
+| IV · The Summit | Tower Master Sable | 560–720 | almost your pace |
+
+- The tower screen shows your team standing on the floor you're on. Win, and they hop up to the next floor as the cleared one lights up gold.
+- Lose, and your team tumbles back to the bottom. The climb restarts at Floor I.
+- Clear the Summit to light the beacon and set off fireworks.
+- Your team is fully healed and gets a fresh bag before each floor.
+- Progress is saved per team, so picking a different team starts a new climb. Your best result is remembered.
+- Tower battles take place in the tower's own arena, decked in each floor's colours, with their own theme music on the tower screen.
+
 ## Battle mechanics
 
 - **Stats:** level 50, perfect IVs, no EVs, neutral nature.
@@ -136,7 +154,11 @@ Mouse, keyboard and game controllers all work. Controllers use the standard Xbox
 
 ```
 index.html       Team select screen
-battle.html      Battle screen
+battle.html      Battle screen (wild battles and tower floors)
+tower.html       Battle Tower screen
+css/tower.css    Battle Tower styles
+js/tower.js      Battle Tower screen: the tower, climbing, celebrations
+js/tower-data.js Tower floors and saved climb progress
 css/style.css    Team select styles
 css/battle.css   Battle styles
 js/api.js        PokéAPI requests, caching, sprites and learnsets

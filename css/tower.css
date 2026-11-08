@@ -1,0 +1,375 @@
+/* Battle Tower page — builds on style.css (tokens, buttons, toast, controller legend). */
+
+.tower-page {
+  --floor-h: clamp(72px, 12.5vh, 112px);
+  --tower-w: min(420px, 62vw);
+  min-height: 100vh;
+  overflow: hidden;
+  background: linear-gradient(180deg, #050716 0%, #101640 45%, #2a1f55 75%, #45305f 100%);
+}
+.tower-page::before { display: none; }
+
+/* ---------- Sky ---------- */
+
+.sky { position: fixed; inset: 0; pointer-events: none; }
+.star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 4px #fff;
+}
+.star.big { width: 3px; height: 3px; }
+.shooting-star {
+  position: absolute;
+  width: 120px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.9), transparent);
+  rotate: -25deg;
+  opacity: 0;
+}
+.moon {
+  position: absolute;
+  top: 9vh;
+  right: 12vw;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fffbe6, #f2e3b0 60%, #d8c385);
+  box-shadow: 0 0 60px 20px rgba(255, 240, 190, 0.25), 0 0 140px 60px rgba(160, 170, 255, 0.12);
+}
+.moon::after {
+  content: '';
+  position: absolute;
+  top: 26px;
+  left: 50px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(190, 170, 120, 0.4);
+  box-shadow: -26px 22px 0 -3px rgba(190, 170, 120, 0.35);
+}
+.cloud {
+  position: absolute;
+  left: 0;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(200, 205, 255, 0.12);
+  filter: blur(10px);
+}
+
+/* ---------- Header ---------- */
+
+.tower-top {
+  position: relative;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 16px 24px;
+}
+.tower-top .btn:last-child { justify-self: end; }
+.tower-top .btn:first-child { justify-self: start; text-decoration: none; }
+.tower-top h1 {
+  margin: 0;
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(16px, 2.6vw, 26px);
+  color: var(--accent);
+  text-shadow: 3px 3px 0 #000, 0 0 24px rgba(255, 210, 63, 0.45);
+}
+#musicBtn[aria-pressed='false'] { color: var(--muted); }
+
+/* ---------- Scene ---------- */
+
+.tower-scene {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: end;
+  gap: 24px;
+  height: calc(100vh - 80px);
+  padding: 0 32px;
+}
+.tower-wrap {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.tower {
+  position: relative;
+  z-index: 2;
+  width: var(--tower-w);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Light beams sweep from the beacon once the tower is conquered. */
+.beams {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 900px;
+  height: 900px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 20deg, rgba(255, 230, 140, 0.18) 24deg, transparent 30deg 110deg,
+    rgba(255, 230, 140, 0.16) 116deg, transparent 122deg 200deg, rgba(255, 230, 140, 0.18) 206deg, transparent 212deg 290deg,
+    rgba(255, 230, 140, 0.15) 296deg, transparent 302deg);
+  mask-image: radial-gradient(circle, #000 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(circle, #000 20%, transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.beacon {
+  position: relative;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  margin-bottom: -6px;
+  border-radius: 50%;
+  background: #4a3d6e;
+  border: 3px solid #2a2244;
+}
+.beacon span {
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: #ffe9a8;
+  box-shadow: 0 0 10px 4px rgba(255, 210, 100, 0.5);
+  opacity: 0.35;
+}
+.conquered .beacon span { opacity: 1; box-shadow: 0 0 30px 14px rgba(255, 220, 110, 0.9), 0 0 80px 40px rgba(255, 190, 80, 0.4); }
+
+.roof {
+  width: 72%;
+  height: calc(var(--floor-h) * 1.15);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  background:
+    repeating-linear-gradient(115deg, transparent 0 14px, rgba(0, 0, 0, 0.18) 14px 16px),
+    linear-gradient(180deg, #3d3363, #241d40);
+  position: relative;
+}
+.roof::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 8px;
+  background: #6b5f96;
+}
+
+.floors { width: 100%; display: flex; flex-direction: column; align-items: center; }
+
+.floor {
+  --accent: #ffd23f;
+  position: relative;
+  width: var(--w);
+  height: var(--floor-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 7px solid #7a6fa5;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.35)),
+    repeating-linear-gradient(0deg, transparent 0 20px, rgba(0, 0, 0, 0.32) 20px 22px),
+    repeating-linear-gradient(90deg, transparent 0 44px, rgba(0, 0, 0, 0.25) 44px 46px),
+    #4d4572;
+  box-shadow: inset 12px 0 18px rgba(0, 0, 0, 0.35), inset -12px 0 18px rgba(0, 0, 0, 0.35);
+  transition: box-shadow 0.4s;
+}
+
+.floor-windows { display: flex; gap: 14%; width: 70%; justify-content: center; }
+.win {
+  width: clamp(18px, 3.6vw, 30px);
+  height: calc(var(--floor-h) * 0.5);
+  border-radius: 50% 50% 3px 3px / 35% 35% 3px 3px;
+  border: 3px solid #2a2244;
+  background: #0f0c1e;
+  box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.7);
+  transition: background 0.4s, box-shadow 0.4s;
+}
+.floor.cleared .win {
+  background: linear-gradient(180deg, #fff1c2, #ffc95c);
+  box-shadow: 0 0 14px 3px rgba(255, 200, 90, 0.55), inset 0 -4px 8px rgba(200, 120, 20, 0.5);
+}
+.floor.current .win {
+  background: var(--accent);
+  animation: window-pulse 1.4s ease-in-out infinite;
+}
+@keyframes window-pulse {
+  0%, 100% { box-shadow: 0 0 6px 1px var(--accent); filter: brightness(0.85); }
+  50% { box-shadow: 0 0 22px 6px var(--accent); filter: brightness(1.15); }
+}
+.floor.current { box-shadow: inset 12px 0 18px rgba(0, 0, 0, 0.35), inset -12px 0 18px rgba(0, 0, 0, 0.35), 0 0 0 2px var(--accent), 0 0 34px -4px var(--accent); z-index: 1; }
+
+.floor-plate {
+  position: absolute;
+  left: -14px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: #1c1733;
+  border: 2px solid #6b5f96;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.floor-plate b { font-family: 'Press Start 2P', monospace; font-size: 9px; color: var(--accent); }
+.floor.cleared .floor-plate { color: #ffe9a8; border-color: #c9a24a; }
+.floor.cleared .floor-plate::after { content: '✓'; color: #6bd96b; }
+.floor.current .floor-plate { color: #fff; border-color: var(--accent); }
+.floor.locked .floor-plate b { color: #6f6a90; }
+
+.tower-base {
+  width: 112%;
+  height: 46px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  border-top: 8px solid #7a6fa5;
+  background: linear-gradient(180deg, #3b345b, #221c3a);
+  clip-path: polygon(4% 0, 96% 0, 100% 100%, 0 100%);
+}
+.door {
+  width: 40px;
+  height: 38px;
+  border-radius: 20px 20px 0 0;
+  background: linear-gradient(180deg, #120e22, #2a1d10);
+  border: 3px solid #8a6a3a;
+  border-bottom: 0;
+}
+
+.hill {
+  position: absolute;
+  bottom: -60px;
+  left: 50%;
+  z-index: 1;
+  width: 160%;
+  height: 120px;
+  translate: -50% 0;
+  border-radius: 50% 50% 0 0;
+  background: radial-gradient(ellipse at 50% 0, #1d2a3a, #0b1018 70%);
+}
+
+/* Your team, standing on the floor you're on. */
+.climbers {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  pointer-events: none;
+}
+.climbers img {
+  max-height: 58px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.6));
+}
+
+/* ---------- Floor card ---------- */
+
+.floor-card {
+  align-self: center;
+  padding: 22px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: rgba(22, 26, 51, 0.88);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+.card-kicker { margin: 0 0 6px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+.floor-card h2 {
+  margin: 0 0 6px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--card-accent, var(--accent));
+}
+.card-trainer { margin: 0 0 14px; font-size: 15px; }
+.pips { display: flex; gap: 8px; margin-bottom: 16px; }
+.pip {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.pip.done { background: linear-gradient(90deg, #c99a1c, #ffe066); }
+.pip.now { background: var(--card-accent, var(--accent)); box-shadow: 0 0 10px var(--card-accent, var(--accent)); }
+.card-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 16px; }
+.card-facts div { padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); }
+.card-facts dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.card-facts dd { margin: 3px 0 0; font-weight: 600; }
+.card-stars { color: #ffd23f; letter-spacing: 2px; }
+.card-stars .dim { color: rgba(255, 255, 255, 0.18); }
+.card-team { display: flex; justify-content: center; gap: 8px; min-height: 64px; margin-bottom: 14px; }
+.card-team img { max-height: 60px; image-rendering: pixelated; }
+.floor-card .btn + .btn { margin-top: 8px; }
+.card-best { margin: 12px 0 0; text-align: center; color: var(--muted); font-size: 13px; }
+
+/* ---------- Effects ---------- */
+
+.fireworks { position: fixed; inset: 0; z-index: 6; width: 100%; height: 100%; pointer-events: none; }
+.tower-flash { position: fixed; inset: 0; z-index: 30; background: #fff; opacity: 0; pointer-events: none; }
+.sparkle {
+  position: absolute;
+  z-index: 5;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffe9a8;
+  box-shadow: 0 0 8px 2px #ffd23f;
+  pointer-events: none;
+}
+
+.tower-banner {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(4, 6, 20, 0.45);
+}
+.tower-banner[hidden] { display: none; }
+.banner-card {
+  padding: 28px 32px;
+  border-radius: 22px;
+  border: 2px solid #c9a24a;
+  background: rgba(22, 26, 51, 0.92);
+  text-align: center;
+  box-shadow: 0 0 60px rgba(255, 200, 90, 0.35);
+}
+.banner-card h2 {
+  margin: 0 0 10px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(18px, 3vw, 26px);
+  color: #ffd23f;
+  text-shadow: 3px 3px 0 #000;
+}
+.banner-card p { margin: 0 0 18px; color: #cfd3f5; }
+.banner-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.banner-actions .btn { text-decoration: none; }
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 860px) {
+  .tower-page { --floor-h: clamp(54px, 8.5vh, 80px); --tower-w: min(320px, 78vw); overflow-y: auto; }
+  .tower-top { padding: 12px 16px; }
+  .tower-top .btn { font-size: 12px; padding: 8px 10px; }
+  .tower-scene { grid-template-columns: 1fr; height: auto; padding: 0 16px 32px; gap: 16px; }
+  .tower-wrap { height: auto; padding-top: 40px; min-height: 60vh; }
+  .floor-plate { font-size: 9px; left: -8px; }
+  .moon { width: 60px; height: 60px; right: 8vw; }
+}

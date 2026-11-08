@@ -93,6 +93,39 @@ const Music = (() => {
       },
     },
 
+    // Stately climbing theme in D minor: Dm – Bb – C – A – Dm – Bb – Gm – A.
+    tower: {
+      bpm: 100,
+      loop: true,
+      parts: [
+        {
+          wave: 'square', volume: 0.07, pattern: [
+            'D5 . . . F5 . A5 . . . G5 . F5 . E5 .',
+            'F5 . . . D5 . . . A#4 . . . D5 . . .',
+            'E5 . . . G5 . C6 . . . A#5 . A5 . G5 .',
+            'A5 . . . . . . . C#5 . E5 . A5 . . .',
+            'D6 . . . A5 . . . F5 . . . A5 . D6 .',
+            'C6 . A#5 . . . F5 . D5 . F5 . A#5 . . .',
+            'A#5 . A5 . G5 . . . D5 . G5 . A#5 . . .',
+            'A5 . . . G5 . E5 . C#5 . . . . . . .',
+          ].join(' '),
+        },
+        {
+          wave: 'square', volume: 0.022, pattern: arp([
+            ['D4', 'F4', 'A4'], ['A#3', 'D4', 'F4'], ['C4', 'E4', 'G4'], ['A3', 'C#4', 'E4'],
+            ['D4', 'F4', 'A4'], ['A#3', 'D4', 'F4'], ['G3', 'A#3', 'D4'], ['A3', 'C#4', 'E4'],
+          ]),
+        },
+        {
+          wave: 'triangle', volume: 0.17, pattern: walk([
+            ['D3', 'A2'], ['A#2', 'F2'], ['C3', 'G2'], ['A2', 'E2'],
+            ['D3', 'A2'], ['A#2', 'F2'], ['G2', 'D3'], ['A2', 'E2'],
+          ]),
+        },
+      ],
+      drums: { volume: 0.7, pattern: repeat('k - - h s - - h k - k h s - - h', 8) },
+    },
+
     victory: {
       bpm: 150,
       loop: false,

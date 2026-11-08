@@ -21,6 +21,7 @@
     abilities: $('#detailAbilities'), stats: $('#detailStats'), add: $('#detailAdd'),
     cost: $('#detailCost'), note: $('#detailNote'), budgetText: $('#budgetText'), budgetBar: $('#budgetBar'),
     toast: $('#toast'), overlay: $('#overlay'), podium: $('#podium'), editBtn: $('#editBtn'), battleBtn: $('#battleBtn'),
+    towerBtn: $('#towerBtn'), towerProgress: $('#towerProgress'),
   };
 
   const state = {
@@ -617,7 +618,13 @@
     const imgs = els.podium.querySelectorAll('img');
     imgs.forEach((img, i) => setSprite(img, team[i].id));
     els.overlay.hidden = false;
-    els.editBtn.focus();
+    els.battleBtn.focus();
+
+    // Show where this team's Battle Tower climb stands.
+    const floor = Tower.getRun().floor;
+    els.towerProgress.textContent = floor >= Tower.FLOORS.length
+      ? 'Battle Tower: conquered!'
+      : `Battle Tower: next up Floor ${Tower.ROMAN[floor]} of ${Tower.FLOORS.length}`;
 
     overlayTimeline?.kill();
     overlayTimeline = gsap.timeline()
@@ -625,14 +632,13 @@
       .fromTo('.overlay-flash', { opacity: 1 }, { opacity: 0, duration: 0.7, ease: 'power2.out' }, 0)
       .fromTo('.overlay-card', { scale: 0.85, y: 24 }, { scale: 1, y: 0, duration: 0.55, ease: 'back.out(1.6)' }, 0.1)
       .fromTo('.podium-spot', { y: -140, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8, stagger: 0.18, ease: 'bounce.out' }, 0.3)
-      .add(() => imgs.forEach((img, i) => bob(img, i)))
-      // Straight into battle unless "Edit team" is pressed first.
-      .add(goToBattle, '+=1.4');
+      .add(() => imgs.forEach((img, i) => bob(img, i)));
   }
 
-  function goToBattle() {
+  // Flash to white, then on to a wild battle or the Battle Tower.
+  function goTo(url) {
     overlayTimeline?.kill();
-    gsap.to('.overlay-flash', { opacity: 1, duration: 0.35, ease: 'power2.in', onComplete: () => { location.href = 'battle.html'; } });
+    gsap.to('.overlay-flash', { opacity: 1, duration: 0.35, ease: 'power2.in', onComplete: () => { location.href = url; } });
   }
 
   function hideOverlay() {
@@ -683,8 +689,12 @@
 
   function onPad(action) {
     if (!els.overlay.hidden) {
+      const buttons = [els.editBtn, els.battleBtn, els.towerBtn];
+      const index = buttons.indexOf(document.activeElement);
       if (action === 'back') hideOverlay();
-      else if (action === 'confirm' || action === 'start') goToBattle();
+      else if (action === 'left' || action === 'right') {
+        buttons[(Math.max(index, 0) + (action === 'right' ? 1 : buttons.length - 1)) % buttons.length].focus();
+      } else if (action === 'confirm' || action === 'start') (buttons[index] || els.battleBtn).click();
       return;
     }
     if (els.detail.classList.contains('open')) {
@@ -777,7 +787,8 @@
     els.random.addEventListener('click', randomTeam);
     els.confirm.addEventListener('click', confirmTeam);
     els.editBtn.addEventListener('click', hideOverlay);
-    els.battleBtn.addEventListener('click', goToBattle);
+    els.battleBtn.addEventListener('click', () => goTo('battle.html'));
+    els.towerBtn.addEventListener('click', () => goTo('tower.html'));
     els.mute.addEventListener('click', () => {
       state.muted = !state.muted;
       store.set(STORAGE.muted, state.muted);

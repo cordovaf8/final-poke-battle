@@ -6,8 +6,14 @@
   const BIOMES = ['forest', 'autumn', 'night'];
   // Gen V pixel sprites are small, so they get scaled up more than the HD Showdown ones.
   const KIND_SCALE = { pixel: 2, hd: 1.3, still: 1.6 };
-  // Wild Pokémon gauges fill a little slower, since you need time to work the menus.
-  const ENEMY_ATB_SCALE = 1.3;
+  // battle.html?mode=tower&floor=N fights a Battle Tower floor instead of wild Pokémon.
+  const params = new URLSearchParams(location.search);
+  const towerFloor = params.get('mode') === 'tower'
+    ? Math.min(Math.max(Number(params.get('floor')) || 1, 1), Tower.FLOORS.length)
+    : 0;
+  const floorInfo = towerFloor ? Tower.FLOORS[towerFloor - 1] : null;
+  // Foe gauges fill a little slower than yours, since you need time to work the menus; tower floors speed them up.
+  const ENEMY_ATB_SCALE = floorInfo ? floorInfo.atbScale : 1.3;
   const ITEM_SPRITES = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items';
   const ITEMS = [
     { id: 'potion', name: 'Potion', qty: 5, target: 'ally', heal: 20, text: 'Restores 20 HP to one Pokémon.' },
@@ -59,6 +65,7 @@
     moveList: $('#moveList'), itemMenu: $('#itemMenu'), itemList: $('#itemList'), flash: $('#flash'),
     result: $('#result'), resultTitle: $('#resultTitle'), resultText: $('#resultText'), againBtn: $('#againBtn'),
     music: $('#musicBtn'), viewBtn: $('#viewBtn'), plates: $('#plates'), enemyWindow: $('.enemy-window'),
+    floorTitle: $('#floorTitle'), backBtn: $('.back-btn'), enemyTitle: $('.enemy-window .hud-head span'),
   };
   const VIEW_KEY = 'battleView';
   // How far the commanded Pokémon steps toward the enemy (px).
@@ -94,7 +101,7 @@
   const unitOf = f => (f.side === 'party' ? battle.units : battle.enemyUnits)[f.index];
   const innerOf = unit => unit.querySelector('.unit-inner');
   const imgOf = f => unitOf(f).querySelector('img');
-  const displayName = f => (f.side === 'enemy' ? `Wild ${f.name}` : f.name);
+  const displayName = f => (f.side === 'enemy' ? `${floorInfo ? 'Foe' : 'Wild'} ${f.name}` : f.name);
   // Maps a clicked unit sprite or HUD row back to its fighter.
   function fighterOf(el) {
     const node = el.closest('.unit, .unit-row');
@@ -126,8 +133,28 @@
     // The saved team is re-fetched so it includes learnsets.
     const partyIds = readTeam()?.map(p => p.id) || randomIds(3);
     const party = await Promise.all(partyIds.map(id => PokeAPI.loadDetails(id)));
-    const enemies = await Promise.all(randomIds(3, partyIds).map(id => PokeAPI.loadDetails(id)));
+    const enemyIds = floorInfo ? await pickByStrength(3, floorInfo.bst, partyIds) : randomIds(3, partyIds);
+    const enemies = await Promise.all(enemyIds.map(id => PokeAPI.loadDetails(id)));
     return { party, enemies };
+  }
+
+  // Random Pokémon whose base stat total falls in [min, max]. Stat totals already cached
+  // from the team select screen are used first; the rest are looked up a batch at a time.
+  async function pickByStrength(count, [min, max], exclude) {
+    const ids = gsap.utils.shuffle(Array.from({ length: MAX_ID }, (_, i) => i + 1)).filter(id => !exclude.includes(id));
+    const inRange = id => {
+      const bst = PokeAPI.cachedBst(id);
+      return bst != null && bst >= min && bst <= max;
+    };
+    const picks = ids.filter(inRange).slice(0, count);
+    for (let i = 0; picks.length < count && i < ids.length && i < 240; i += 12) {
+      const batch = ids.slice(i, i + 12).filter(id => PokeAPI.cachedBst(id) == null);
+      await Promise.allSettled(batch.map(id => PokeAPI.loadBst(id)));
+      batch.forEach(id => picks.length < count && inRange(id) && picks.push(id));
+    }
+    // Should never be needed, but never leave a floor without foes.
+    if (picks.length < count) picks.push(...randomIds(count - picks.length, [...exclude, ...picks]));
+    return picks;
   }
 
   // Level-up attacks learned by the battle level, with PP tracked per fighter.
@@ -178,7 +205,52 @@
     els.frame.innerHTML = `<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${near}</svg>`;
   }
 
-  function buildMotes() {
+  // Battle Tower arena: a moonlit hall of arched windows and pillars hung with the floor's banners,
+  // framed by two big torch-lit pillars.
+  function buildTowerScenery() {
+    let wall = `
+      <defs>
+        <linearGradient id="moonlight" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#cfd8ff" stop-opacity="0.55"/>
+          <stop offset="1" stop-color="#6b74c9" stop-opacity="0.12"/>
+        </linearGradient>
+      </defs>
+      <rect class="t-wall" x="0" y="0" width="1600" height="500"/>`;
+    for (let x = -40; x < 1640; x += 280) {
+      wall += `<path d="M${x + 90},470 V170 a55,55 0 0 1 110,0 V470 Z" fill="url(#moonlight)"/>`;
+      wall += `<path class="t-mullion" d="M${x + 145},115 V470 M${x + 90},300 H${x + 200}"/>`;
+      wall += `<rect class="t-pillar" x="${x + 225}" y="0" width="70" height="500"/>`;
+      wall += `<rect class="t-cap" x="${x + 213}" y="60" width="94" height="24"/>`;
+      wall += `<rect class="t-cap" x="${x + 213}" y="470" width="94" height="30"/>`;
+      wall += `<path class="t-banner" d="M${x + 240},90 h40 v150 l-20,-18 l-20,18 Z"/>`;
+    }
+    els.backdrop.innerHTML = svgLayer('layer mid', wall);
+
+    let near = '';
+    for (const x of [30, 1460]) {
+      near += `<rect class="t-near" x="${x}" y="0" width="110" height="900"/>`;
+      near += `<rect class="t-near-cap" x="${x - 14}" y="120" width="138" height="26"/>`;
+      near += `<path class="t-bracket" d="M${x + 41},420 l14,-40 l14,40 Z"/>`;
+      near += `<circle class="t-glow" cx="${x + 55}" cy="362" r="70"/>`;
+      near += `<ellipse class="t-flame" cx="${x + 55}" cy="366" rx="12" ry="20"/>`;
+    }
+    els.frame.innerHTML = `
+      <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <radialGradient id="torchglow">
+            <stop offset="0" stop-color="#ffb347" stop-opacity="0.55"/>
+            <stop offset="1" stop-color="#ffb347" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        ${near}
+      </svg>`;
+    els.frame.querySelectorAll('.t-flame, .t-glow').forEach(el => gsap.to(el, {
+      opacity: 'random(0.65, 1)', scale: 'random(0.9, 1.12)', transformOrigin: '50% 100%',
+      duration: 'random(0.08, 0.2)', repeat: -1, yoyo: true, repeatRefresh: true,
+    }));
+  }
+
+  function buildMotes(rising = false) {
     const motes = Array.from({ length: 18 }, () => {
       const m = document.createElement('span');
       m.className = 'mote';
@@ -187,9 +259,10 @@
       return m;
     });
     els.motes.replaceChildren(...motes);
+    // Embers drift up in the tower; elsewhere the specks wander.
     motes.forEach(m => gsap.to(m, {
-      x: 'random(-70, 70)', y: 'random(-50, 50)', opacity: 'random(0.15, 0.9)',
-      duration: 'random(3, 6)', repeat: -1, yoyo: true, repeatRefresh: true, ease: 'sine.inOut',
+      x: 'random(-70, 70)', y: rising ? 'random(-160, -60)' : 'random(-50, 50)', opacity: 'random(0.15, 0.9)',
+      duration: 'random(3, 6)', repeat: -1, yoyo: !rising, repeatRefresh: true, ease: 'sine.inOut',
     }));
   }
 
@@ -769,7 +842,7 @@
     const target = scope === 'self' ? f : pick(living(battle.party));
     if (!target) return;
     const row = rowOf(f);
-    showMessage(`Wild ${f.name} used ${move.name}!`);
+    showMessage(`${displayName(f)} used ${move.name}!`);
     row.classList.add('acting');
     drainAtb(row);
 
@@ -1246,7 +1319,10 @@
     Gamepad.on(onPad);
 
     els.command.querySelectorAll('.pointer').forEach(bobPointer);
-    els.againBtn.addEventListener('click', () => location.reload());
+    els.againBtn.addEventListener('click', () => {
+      if (battle.nextUrl) location.href = battle.nextUrl;
+      else location.reload();
+    });
     els.music.addEventListener('click', () => {
       Music.toggle();
       updateMusicButton();
@@ -1283,13 +1359,31 @@
     battle.ready = [];
     document.querySelectorAll('.atb i').forEach(fill => gsap.killTweensOf(fill));
     document.querySelectorAll('.unit-row').forEach(row => row.classList.remove('ready', 'active'));
+    // Tower progress: a win unlocks the next floor, a loss sends the climb back to Floor I.
+    if (floorInfo) Tower.setFloor(won ? towerFloor : 0);
     Music.play(won ? 'victory' : 'defeat');
     gsap.delayedCall(1.5, () => showResult(won));
   }
 
+  function resultCopy(won) {
+    if (!floorInfo) {
+      return won
+        ? { title: 'Victory!', text: 'All the wild Pokémon fainted.', button: 'Battle again' }
+        : { title: 'Defeated…', text: 'Your whole team fainted.', button: 'Battle again' };
+    }
+    const roman = Tower.ROMAN[towerFloor - 1];
+    const next = Tower.FLOORS[towerFloor];
+    battle.nextUrl = `tower.html?${won ? 'cleared' : 'fell'}=${towerFloor}`;
+    if (!won) return { title: 'Defeated…', text: `Your team fell on Floor ${roman}. The climb starts over.`, button: 'Back to tower' };
+    if (!next) return { title: 'Tower conquered!', text: `${floorInfo.trainer} has fallen. The summit is yours!`, button: 'To the summit' };
+    return { title: `Floor ${roman} cleared!`, text: `Next up: Floor ${Tower.ROMAN[towerFloor]} · ${next.name}`, button: 'Continue climb' };
+  }
+
   function showResult(won) {
-    els.resultTitle.textContent = won ? 'Victory!' : 'Defeated…';
-    els.resultText.textContent = won ? 'All the wild Pokémon fainted.' : 'Your whole team fainted.';
+    const copy = resultCopy(won);
+    els.resultTitle.textContent = copy.title;
+    els.resultText.textContent = copy.text;
+    els.againBtn.textContent = copy.button;
     els.result.classList.toggle('lost', !won);
     els.result.hidden = false;
     gsap.fromTo(els.result, { opacity: 0 }, { opacity: 1, duration: 0.3 });
@@ -1323,19 +1417,48 @@
       .to(inners(battle.units), { y: -18, duration: 0.15, stagger: 0.12, yoyo: true, repeat: 1, ease: 'power2.out' }, '>-0.1')
       .from(els.hud, { yPercent: 110, duration: 0.5, ease: 'power3.out' }, 1.1)
       .from(els.plates, { opacity: 0, duration: 0.4 }, 1.1)
-      .add(() => showMessage(`Wild ${names.slice(0, -1).join(', ')} and ${names.at(-1)} appeared!`), 1.2)
+      .add(() => showMessage(floorInfo
+        ? `${floorInfo.trainer} sends out ${names.slice(0, -1).join(', ')} and ${names.at(-1)}!`
+        : `Wild ${names.slice(0, -1).join(', ')} and ${names.at(-1)} appeared!`), 1.2)
       .add(() => {
         battle.party.forEach((_, i) => fillPartyAtb(i, rand(0, 0.35)));
         battle.enemies.forEach((_, j) => fillEnemyAtb(j, rand(0, 0.2)));
-      }, 1.8);
+      }, floorInfo ? 2.6 : 1.8);
+
+    // Tower floors open with a big title card.
+    if (floorInfo) {
+      els.floorTitle.querySelector('small').textContent = `Floor ${Tower.ROMAN[towerFloor - 1]}`;
+      els.floorTitle.querySelector('strong').textContent = floorInfo.name;
+      els.floorTitle.hidden = false;
+      gsap.timeline({ delay: 0.3, onComplete: () => { els.floorTitle.hidden = true; } })
+        .fromTo(els.floorTitle, { scale: 1.6, opacity: 0, filter: 'blur(8px)' }, { scale: 1, opacity: 1, filter: 'blur(0px)', duration: 0.5, ease: 'power3.out' })
+        .to(els.floorTitle, { opacity: 0, y: -20, duration: 0.4, delay: 1.3 });
+    }
+  }
+
+  // Wild battles roam outdoors; tower battles happen in the tower's arena, decked in the floor's colour.
+  function setupMode() {
+    if (!floorInfo) {
+      els.field.dataset.biome = pick(BIOMES);
+      buildScenery();
+      buildMotes();
+      return;
+    }
+    els.field.dataset.biome = 'tower';
+    els.field.style.setProperty('--floor-accent', floorInfo.color);
+    buildTowerScenery();
+    buildMotes(true);
+    els.loading.innerHTML = `Climbing to Floor ${Tower.ROMAN[towerFloor - 1]}<span class="dots"></span>`;
+    els.backBtn.textContent = '← Tower';
+    els.backBtn.href = 'tower.html';
+    els.enemyTitle.textContent = floorInfo.trainer;
+    document.title = `Battle Tower · Floor ${Tower.ROMAN[towerFloor - 1]}`;
   }
 
   // ---------- Boot ----------
 
   async function init() {
-    els.field.dataset.biome = pick(BIOMES);
-    buildScenery();
-    buildMotes();
+    setupMode();
     gsap.set(els.flash, { opacity: 1 });
     gsap.to(els.flash, { opacity: 0.85, duration: 0.3 });
 

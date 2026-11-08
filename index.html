@@ -96,11 +96,13 @@
     <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="overlayTitle">
       <h2 id="overlayTitle">Team assembled!</h2>
       <div class="podium" id="podium"></div>
-      <p class="overlay-note">Heading into battle…</p>
+      <p class="overlay-note">Choose your challenge</p>
       <div class="overlay-actions">
         <button type="button" class="btn" id="editBtn">Edit team</button>
-        <button type="button" class="btn primary" id="battleBtn">Battle!</button>
+        <button type="button" class="btn primary" id="battleBtn">Wild battle</button>
+        <button type="button" class="btn primary tower-btn" id="towerBtn">Battle Tower</button>
       </div>
+      <p class="overlay-sub" id="towerProgress"></p>
     </div>
   </div>
 
@@ -108,6 +110,7 @@
   <script src="js/api.js"></script>
   <script src="js/music.js"></script>
   <script src="js/gamepad.js"></script>
+  <script src="js/tower-data.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
