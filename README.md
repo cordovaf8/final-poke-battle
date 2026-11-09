@@ -70,7 +70,7 @@ Your team is on the left and the wild Pokémon are on the right, with each Poké
   - Evolving costs one charge and freezes the whole battle for a short cutscene with its own music. The field dims, the Pokémon turns to light and flickers faster and faster between its old and new shapes, then bursts into its new form.
   - The new form gets its new name, types and stats. It keeps its moves, PP, status and stat changes.
   - It also **regains half of the health it had lost**, as a share of max HP. For example, at 40% HP it evolves to 70%.
-  - A middle stage (Machoke, Ivysaur…) gets a fresh gauge for its next evolution. Branching lines like Eevee's evolve into one of their evolutions at random.
+  - A middle stage (Machoke, Ivysaur…) gets a new gauge for its next evolution that starts half full. Branching lines like Eevee's evolve into one of their evolutions at random.
   - Evolutions last for that battle only. Your team is back to its chosen forms for the next one.
 - **Attack animations:** every attack is animated in its type's style.
   - **Contact attacks** (Tackle, Fire Punch…) lunge in and land with a type-coloured impact.

@@ -1082,7 +1082,8 @@
 
   // Looks up the next stage in the background and preloads its sprite, then shows the gauge.
   // Branching lines (Eevee, Poliwhirl…) pick one of their evolutions at random.
-  async function prepareEvolution(f) {
+  // from: how full the gauge starts (a middle stage that just evolved starts at half).
+  async function prepareEvolution(f, from = 0) {
     try {
       const stages = await PokeAPI.loadNextStages(await PokeAPI.loadDetails(f.id));
       if (!stages.length) return;
@@ -1101,7 +1102,7 @@
       bar.hidden = false;
       bar.title = `Evolution gauge: evolves into ${to.name}`;
       positionPlates();
-      if (battle.started) fillEvo(f);
+      if (battle.started) fillEvo(f, from);
     } catch {
       // No evolution this battle if PokéAPI can't be reached.
     }
@@ -1254,8 +1255,8 @@
         gsap.set(evoFill(f), { scaleX: 0 });
         f.evo = null;
         battle.evolving = null;
-        // A middle stage gets a fresh gauge for its next evolution.
-        prepareEvolution(f);
+        // A middle stage gets a new gauge for its next evolution, already half full.
+        prepareEvolution(f, 0.5);
         const queued = battle.evoQueue.shift();
         if (queued) {
           world.resume();
@@ -1890,7 +1891,7 @@
     ]);
     els.loading.remove();
     // Next stages load in the background; their gauges appear once ready.
-    [...battle.party, ...battle.enemies].forEach(prepareEvolution);
+    [...battle.party, ...battle.enemies].forEach(f => prepareEvolution(f));
     // Advanced is the default; Traditional only if the player picked it before.
     let view = 'advanced';
     try { view = localStorage.getItem(VIEW_KEY) === 'traditional' ? 'traditional' : 'advanced'; } catch { /* default */ }
