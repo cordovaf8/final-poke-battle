@@ -536,6 +536,7 @@
     if (f.status === 'burn' || f.status === 'poison') {
       const burn = f.status === 'burn';
       const damage = Math.max(1, Math.floor(f.maxHp / (burn ? 16 : 8)));
+      Fx.ailment(imgOf(f), f.status);
       blink(imgOf(f));
       popup(f, damage, 'damage', burn ? 'Burn' : 'Poison');
       setHp(f, f.hp - damage);
@@ -557,6 +558,7 @@
   function loseTurn(f, text) {
     showMessage(text);
     popup(f, STATUS_INFO[f.status].tag, 'status');
+    Fx.ailment(imgOf(f), f.status);
     drainAtb(rowOf(f));
     gsap.delayedCall(0.8, () => refillAtb(f));
     return false;
@@ -649,6 +651,36 @@
       .to({}, { duration: 0.4 });
   }
 
+  // Plays a move from wind-up to landing, resolving it the moment it hits.
+  // Contact moves lunge in; special, status and ranged moves fly across the field.
+  function perform(tl, f, target, move) {
+    const unit = unitOf(f);
+    const scope = moveScope(move);
+    if (scope === 'self' || scope === 'none') {
+      cast(tl, unit, () => {
+        Fx.aura(move, imgOf(f));
+        resolveMove(f, f, move);
+      });
+      return;
+    }
+    const dir = f.side === 'party' ? 1 : -1;
+    const foes = f.side === 'party' ? battle.enemies : battle.party;
+    // Real time: if the chosen foe fainted before the move went off, aim at another.
+    const aim = () => {
+      if (scope === 'foe' && (!target || target.fainted)) target = pick(living(foes)) || null;
+      return scope === 'foes' ? living(foes) : [target].filter(Boolean);
+    };
+    const land = () => resolveMove(f, target, move);
+    if (!Fx.ranged(move)) {
+      tl.add(() => Fx.windup(move, imgOf(f)));
+      lunge(tl, unit, dir, land);
+      return;
+    }
+    tl.to(innerOf(unit), { x: `+=${16 * dir}`, duration: 0.15, ease: 'power2.out' });
+    Fx.deliver(tl, move, imgOf(f), () => aim().map(imgOf));
+    tl.add(land).to({}, { duration: 0.45 });
+  }
+
   // Resolves a move at the moment it lands: confusion first, then damage or the status effect.
   function resolveMove(attacker, target, move) {
     if (battle.over || attacker.fainted) return;
@@ -668,7 +700,8 @@
     } else {
       for (const t of scope === 'foes' ? living(foes) : [target]) {
         if (!Combat.hits(attacker, t, move)) popup(t, 'Miss', 'miss');
-        else if (!applyStatusMove(attacker, t, move)) popup(t, 'Failed', 'miss');
+        else if (applyStatusMove(attacker, t, move)) Fx.affect(move, imgOf(t));
+        else popup(t, 'Failed', 'miss');
       }
     }
   }
@@ -727,6 +760,7 @@
   function heal(f, amount, note = '') {
     const healed = Math.min(amount, f.maxHp - f.hp);
     glow(f);
+    Fx.heal(imgOf(f));
     popup(f, `+${healed}`, 'heal', note);
     setHp(f, f.hp + healed);
   }
@@ -736,12 +770,14 @@
       if (f.fainted || f.confused) return false;
       f.confused = 2 + Math.floor(Math.random() * 4); // lasts 2–5 actions
       popup(f, 'CNF', 'status');
+      Fx.ailment(imgOf(f), 'confusion');
       showMessage(`${displayName(f)} became confused!`);
     } else {
       if (!Combat.canReceiveStatus(f, ailment)) return false;
       f.status = ailment;
       if (ailment === 'sleep') f.sleepTurns = 2 + Math.floor(Math.random() * 3); // sleeps through 1–3 turns
       popup(f, STATUS_INFO[ailment].tag, 'status');
+      Fx.ailment(imgOf(f), ailment);
       showMessage(`${displayName(f)} ${STATUS_INFO[ailment].text}`);
       if (ailment === 'sleep' || ailment === 'freeze') interruptTurn(f);
     }
@@ -763,7 +799,9 @@
       const label = STAT_LABELS[stat];
       return delta ? `${label} ${(delta > 0 ? '↑' : '↓').repeat(Math.min(Math.abs(delta), 3))}` : `${label} max`;
     });
-    popup(f, parts.join(' '), applied.some(a => a.delta > 0) ? 'buff' : 'debuff');
+    const up = applied.some(a => a.delta > 0);
+    popup(f, parts.join(' '), up ? 'buff' : 'debuff');
+    if (applied.some(a => a.delta !== 0)) Fx.stat(imgOf(f), up);
     paintConditions(f);
     return applied.some(a => a.delta !== 0);
   }
@@ -808,6 +846,7 @@
       result.crit ? 'Critical hit!' : result.multiplier > 1 ? 'Super effective!' : result.multiplier < 1 ? 'Not very effective' : '',
       reduced ? `Guarded −${Math.round(reduced * 100)}%` : '',
     ].filter(Boolean);
+    Fx.impact(move, imgOf(target), { crit: result.crit, multiplier: result.multiplier });
     if (reduced) showGuard(target, true);
     else blink(imgOf(target));
     shake(target);
@@ -853,8 +892,7 @@
         fillEnemyAtb(j, 0, recoveryFactor(move));
       },
     });
-    if (scope === 'self') cast(tl, unit, () => resolveMove(f, f, move));
-    else lunge(tl, unit, -1, () => resolveMove(f, target, move));
+    perform(tl, f, target, move);
     tl.to(innerOf(unit), { x: 0, duration: 0.3, ease: 'power2.inOut' });
   }
 
@@ -906,6 +944,7 @@
     unitOf(f).classList.remove('fainted');
     rowOf(f).classList.remove('fainted');
     gsap.to(imgOf(f), { filter: 'grayscale(0) brightness(1)', opacity: 1, duration: 0.5, clearProps: 'filter' });
+    Fx.heal(imgOf(f));
     setHp(f, Math.floor(f.maxHp / 2));
     fillPartyAtb(f.index);
   }
@@ -925,9 +964,7 @@
     // Only single-target moves need a target picked; self and all-foe moves go straight off.
     if (scope !== 'foe') {
       move.ppLeft -= 1;
-      endTurn(text, recoveryFactor(move), (tl, unit) => (scope === 'foes'
-        ? lunge(tl, unit, 1, () => resolveMove(f, null, move))
-        : cast(tl, unit, () => resolveMove(f, f, move))));
+      endTurn(text, recoveryFactor(move), tl => perform(tl, f, null, move));
       return;
     }
     beginTargeting({
@@ -935,7 +972,7 @@
       candidates: () => living(battle.enemies),
       onConfirm(target) {
         move.ppLeft -= 1;
-        endTurn(text, recoveryFactor(move), (tl, unit) => lunge(tl, unit, 1, () => resolveMove(f, target, move)));
+        endTurn(text, recoveryFactor(move), tl => perform(tl, f, target, move));
       },
     });
   }
@@ -1459,6 +1496,7 @@
 
   async function init() {
     setupMode();
+    Fx.init(els.field);
     gsap.set(els.flash, { opacity: 1 });
     gsap.to(els.flash, { opacity: 0.85, duration: 0.3 });
 

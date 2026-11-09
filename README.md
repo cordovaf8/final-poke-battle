@@ -52,6 +52,13 @@ Your team is on the left and the wild Pokémon are on the right, with each Poké
 - **Two views:** switch any time with the **View** button (top right), the **V** key or **Y** on a controller. Your choice is remembered.
   - **Advanced** (default): the bottom panel is gone and the battlefield fills the screen. Each Pokémon has a small floating nameplate (name, HP, status, ATB), and the command menu pops up right next to the Pokémon you're commanding, so your eyes stay on the action.
   - **Traditional:** classic layout with your team, commands and the wild Pokémon in a panel along the bottom.
+- **Attack animations:** every attack is animated in its type's style.
+  - **Contact attacks** (Tackle, Fire Punch…) lunge in and land with a type-coloured impact.
+  - **Special and status attacks** charge up, then fly across the field: fireballs, streams of bubbles, lightning from the sky, falling rocks, whirling leaves, ice shards, psychic rings and more.
+  - **Some move names have their own look:** beams (Hyper Beam, Ice Beam…), slashes and claws, biting jaws, and ground-shaking quakes.
+  - **Big hits shake the field:** critical hits flash it, super-effective hits shake it, and stronger attacks throw bigger effects.
+  - **Conditions are animated too:** stat changes, healing and status conditions (flames for burn, Zs for sleep and so on).
+  - Screen shake and flashes are skipped or toned down if your system asks for reduced motion.
 - Win by making all three wild Pokémon faint. Lose if your whole team does.
 
 ### Controls
@@ -165,6 +172,7 @@ js/api.js        PokéAPI requests, caching, sprites and learnsets
 js/app.js        Team select logic and team rules
 js/combat.js     Battle math: stats, type chart, damage, Defend
 js/battle.js     Battle flow: ATB, menus, targeting, animation
+js/fx.js         Attack animations: type-themed projectiles, impacts and auras
 js/music.js      Chiptune synth, sequencer and the soundtrack
 js/gamepad.js    Controller input (Gamepad API)
 ```
