@@ -6,12 +6,14 @@ const Tower = (() => {
 
   // Each floor's foes are drawn from a base-stat-total range, and their gauges fill faster as you climb.
   const FLOORS = [
-    { name: 'The Gate', trainer: 'Gatekeeper Rowan', bst: [300, 430], atbScale: 1.35, color: '#6bd96b', stars: 1 },
-    { name: 'The Hall', trainer: 'Ace Trainer Mira', bst: [420, 500], atbScale: 1.25, color: '#4fb8ff', stars: 2 },
-    { name: 'The Spire', trainer: 'Veteran Holt', bst: [490, 560], atbScale: 1.15, color: '#c77dff', stars: 3 },
-    { name: 'The Summit', trainer: 'Tower Master Sable', bst: [560, 720], atbScale: 1.05, color: '#ffd23f', stars: 4 },
+    { name: 'The Gate', trainer: 'Gatekeeper Rowan', bst: [300, 430], atbScale: 1.35, color: '#6bd96b' },
+    { name: 'The Hall', trainer: 'Ace Trainer Mira', bst: [400, 480], atbScale: 1.28, color: '#4fb8ff' },
+    { name: 'The Armory', trainer: 'Battle Girl Juno', bst: [450, 520], atbScale: 1.21, color: '#ff9f43' },
+    { name: 'The Spire', trainer: 'Veteran Holt', bst: [490, 560], atbScale: 1.14, color: '#c77dff' },
+    { name: 'The Sanctum', trainer: 'Elite Trainer Kael', bst: [530, 600], atbScale: 1.08, color: '#ff5d6c' },
+    { name: 'The Summit', trainer: 'Tower Master Sable', bst: [570, 720], atbScale: 1.02, color: '#ffd23f' },
   ];
-  const ROMAN = ['I', 'II', 'III', 'IV'];
+  const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 
   function read(key, fallback) {
     try {
@@ -27,7 +29,7 @@ const Tower = (() => {
 
   const teamIds = () => (read(TEAM_KEY, []) || []).map(p => p.id);
 
-  // A run stores the next floor to fight (0–3, or 4 once the tower is conquered).
+  // A run stores the next floor to fight (0–5, or 6 once the tower is conquered).
   // Changing your team starts a fresh climb.
   function getRun() {
     const ids = teamIds();

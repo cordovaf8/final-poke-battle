@@ -12,8 +12,8 @@
   const TOP = FLOORS.length; // run.floor === TOP means conquered
 
   const params = new URLSearchParams(location.search);
-  const cleared = Number(params.get('cleared')) || 0; // floor number (1–4) just won
-  const fell = Number(params.get('fell')) || 0; // floor number (1–4) just lost
+  const cleared = Number(params.get('cleared')) || 0; // floor number (1–6) just won
+  const fell = Number(params.get('fell')) || 0; // floor number (1–6) just lost
   // Don't replay the climb/fall animation on a refresh.
   if (cleared || fell) history.replaceState(null, '', 'tower.html');
 
@@ -87,7 +87,7 @@
   function renderFloors() {
     // Highest floor first so it stacks on top.
     els.floors.innerHTML = FLOORS.map((floor, i) => `
-      <div class="floor" data-floor="${i}" style="--accent: ${floor.color}; --w: ${100 - i * 7}%">
+      <div class="floor" data-floor="${i}" style="--accent: ${floor.color}; --w: ${100 - i * 6}%">
         <div class="floor-windows">${'<span class="win"></span>'.repeat(3)}</div>
         <div class="floor-plate"><b>${Tower.ROMAN[i]}</b>${floor.name}</div>
       </div>`).reverse().join('');
@@ -156,7 +156,7 @@
       els.kicker.textContent = 'Summit reached';
       els.title.textContent = 'Tower conquered!';
       els.trainer.textContent = 'Every floor has fallen to your team.';
-      els.stars2.textContent = '★★★★';
+      els.stars2.textContent = '★'.repeat(TOP);
       els.bst.textContent = '—';
       els.enter.textContent = 'Climb again';
       els.reset.hidden = true;
@@ -166,9 +166,10 @@
     els.card.style.setProperty('--card-accent', floor.color);
     els.kicker.textContent = next === 0 ? 'The climb begins' : 'Next challenge';
     els.title.textContent = `Floor ${Tower.ROMAN[next]} · ${floor.name}`;
-    els.trainer.textContent = `${floor.trainer} awaits${floor.stars === 4 ? ' at the top.' : '.'}`;
-    els.stars2.innerHTML = `${'★'.repeat(floor.stars)}<span class="dim">${'★'.repeat(4 - floor.stars)}</span>`;
-    els.stars2.setAttribute('aria-label', `${floor.stars} of 4`);
+    els.trainer.textContent = `${floor.trainer} awaits${next === TOP - 1 ? ' at the top.' : '.'}`;
+    // Difficulty: one star per floor.
+    els.stars2.innerHTML = `${'★'.repeat(next + 1)}<span class="dim">${'★'.repeat(TOP - next - 1)}</span>`;
+    els.stars2.setAttribute('aria-label', `${next + 1} of ${TOP}`);
     els.bst.textContent = `BST ${floor.bst[0]}–${floor.bst[1]}`;
     els.enter.textContent = `Enter Floor ${Tower.ROMAN[next]}`;
     els.reset.hidden = next === 0;

@@ -111,14 +111,16 @@ Mouse, keyboard and game controllers all work. Controllers use the standard Xbox
 
 ### 3. Battle Tower
 
-After confirming your team, choose **Wild battle** for a quick fight against three random Pokémon, **Battle Tower** to climb four floors of trainer battles, or **Rogue run** (see below).
+After confirming your team, choose **Wild battle** for a quick fight against three random Pokémon, **Battle Tower** to climb six floors of trainer battles, or **Rogue run** (see below).
 
 | Floor | Trainer | Foe strength (BST) | Foe speed |
 | --- | --- | --- | --- |
 | I · The Gate | Gatekeeper Rowan | 300–430 | slowest |
-| II · The Hall | Ace Trainer Mira | 420–500 | faster |
-| III · The Spire | Veteran Holt | 490–560 | faster still |
-| IV · The Summit | Tower Master Sable | 560–720 | almost your pace |
+| II · The Hall | Ace Trainer Mira | 400–480 | faster |
+| III · The Armory | Battle Girl Juno | 450–520 | faster |
+| IV · The Spire | Veteran Holt | 490–560 | faster still |
+| V · The Sanctum | Elite Trainer Kael | 530–600 | faster still |
+| VI · The Summit | Tower Master Sable | 570–720 | almost your pace |
 
 - The tower screen shows your team standing on the floor you're on. Win, and they hop up to the next floor as the cleared one lights up gold.
 - Lose, and your team tumbles back to the bottom. The climb restarts at Floor I.
