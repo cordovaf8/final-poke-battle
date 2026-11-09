@@ -8,7 +8,9 @@
     hp: 'HP', attack: 'Atk', defense: 'Def',
     'special-attack': 'Sp. Atk', 'special-defense': 'Sp. Def', speed: 'Speed',
   };
-  const STORAGE = { team: 'pokemonTeam', draft: 'pokemonTeamDraft', muted: 'pokemonMuted' };
+  // index.html?mode=rogue picks the starting team of a Rogue run: 1★ Pokémon only, kept apart from your usual team.
+  const ROGUE = new URLSearchParams(location.search).get('mode') === 'rogue';
+  const STORAGE = { team: 'pokemonTeam', draft: ROGUE ? 'rogueTeamDraft' : 'pokemonTeamDraft', muted: 'pokemonMuted' };
 
   const $ = sel => document.querySelector(sel);
   const els = {
@@ -19,9 +21,10 @@
     sprite: $('#detailSprite'), num: $('#detailNum'), name: $('#detailName'), genus: $('#detailGenus'),
     types: $('#detailTypes'), flavor: $('#detailFlavor'), height: $('#detailHeight'), weight: $('#detailWeight'),
     abilities: $('#detailAbilities'), stats: $('#detailStats'), add: $('#detailAdd'),
-    cost: $('#detailCost'), note: $('#detailNote'), budgetText: $('#budgetText'), budgetBar: $('#budgetBar'),
+    cost: $('#detailCost'), stars: $('#detailStars'), note: $('#detailNote'), budgetText: $('#budgetText'), budgetBar: $('#budgetBar'),
     toast: $('#toast'), overlay: $('#overlay'), podium: $('#podium'), editBtn: $('#editBtn'), battleBtn: $('#battleBtn'),
-    towerBtn: $('#towerBtn'), towerProgress: $('#towerProgress'),
+    towerBtn: $('#towerBtn'), rogueBtn: $('#rogueBtn'), towerProgress: $('#towerProgress'),
+    title: $('.brand h1'), subtitle: $('.brand p'),
   };
 
   const state = {
@@ -52,8 +55,12 @@
   };
   const teamPoints = () => state.team.reduce((sum, p) => sum + (costFor(p.id) ?? 0), 0);
 
-  // Why p can't join the current team, or '' if it can. Cost is only checked once it's known.
+  // Why p can't join the current team, or '' if it can. Cost and stars are only checked once known.
   function ruleViolation(p) {
+    const bst = PokeAPI.cachedBst(p.id);
+    if (ROGUE && bst != null && PokeAPI.starsOf(bst) !== 1) {
+      return `${p.displayName} is ${PokeAPI.starsOf(bst)}★ — a Rogue run starts with 1★ Pokémon`;
+    }
     const clash = state.team.find(m => m.id !== p.id && m.types.some(t => p.types.includes(t)));
     if (clash) {
       const shared = p.types.find(t => clash.types.includes(t));
@@ -141,7 +148,7 @@
   function updateConfirm() {
     const full = state.team.length === MAX_TEAM;
     els.confirm.disabled = !full;
-    els.confirm.textContent = full ? 'Confirm team' : `${state.team.length}/${MAX_TEAM} chosen`;
+    els.confirm.textContent = full ? (ROGUE ? 'Start run' : 'Confirm team') : `${state.team.length}/${MAX_TEAM} chosen`;
     if (full && !confirmPulse) {
       confirmPulse = gsap.to(els.confirm, { scale: 1.07, duration: 0.6, repeat: -1, yoyo: true, ease: 'sine.inOut' });
     } else if (!full && confirmPulse) {
@@ -210,7 +217,7 @@
       <span class="card-sprite"><img alt="" loading="lazy" decoding="async"></span>
       <span class="card-name">${p.displayName}</span>
       <span class="card-types">${p.types.map(typeBadge).join('')}</span>
-      <span class="card-cost">… pts</span>`;
+      <span class="card-meta"><span class="card-stars"></span><span class="card-cost">… pts</span></span>`;
     setSprite(card.querySelector('img'), p.id);
     paintCost(card, p.id);
     return card;
@@ -220,6 +227,7 @@
     const cost = costFor(id);
     const el = card.querySelector('.card-cost');
     if (cost == null) return;
+    card.querySelector('.card-stars').innerHTML = PokeAPI.starsHtml(PokeAPI.cachedBst(id));
     el.textContent = `${cost} pts`;
     el.className = `card-cost ${cost >= 60 ? 'high' : cost >= 45 ? 'mid' : 'low'}`;
   }
@@ -425,6 +433,7 @@
   function paintDetailCost(id) {
     const bst = PokeAPI.cachedBst(id);
     els.cost.textContent = bst == null ? '—' : `${costOf(bst)} pts`;
+    els.stars.innerHTML = bst == null ? '—' : PokeAPI.starsHtml(bst);
     els.cost.title = bst == null ? '' : `Base stat total ${bst}`;
   }
 
@@ -560,6 +569,7 @@
         for (const p of batch) {
           const cost = costFor(p.id);
           if (picks.length === MAX_TEAM || cost == null) continue;
+          if (ROGUE && PokeAPI.starsOf(PokeAPI.cachedBst(p.id)) !== 1) continue;
           if (picks.some(q => q.types.some(t => p.types.includes(t)))) continue;
           // Leave at least ~30 pts per remaining slot so the team can still be finished.
           const slotsAfter = MAX_TEAM - picks.length - 1;
@@ -588,6 +598,13 @@
 
   async function confirmTeam() {
     if (state.team.length !== MAX_TEAM) return;
+    if (ROGUE) {
+      // A new run replaces any run in progress; your usual team is left as it was.
+      Rogue.start(state.team.map(p => p.id));
+      store.set(STORAGE.draft, []);
+      location.href = 'rogue.html';
+      return;
+    }
     els.confirm.disabled = true;
     let details;
     try {
@@ -689,7 +706,7 @@
 
   function onPad(action) {
     if (!els.overlay.hidden) {
-      const buttons = [els.editBtn, els.battleBtn, els.towerBtn];
+      const buttons = [els.editBtn, els.battleBtn, els.towerBtn, els.rogueBtn];
       const index = buttons.indexOf(document.activeElement);
       if (action === 'back') hideOverlay();
       else if (action === 'left' || action === 'right') {
@@ -789,6 +806,7 @@
     els.editBtn.addEventListener('click', hideOverlay);
     els.battleBtn.addEventListener('click', () => goTo('battle.html'));
     els.towerBtn.addEventListener('click', () => goTo('tower.html'));
+    els.rogueBtn.addEventListener('click', () => goTo('rogue.html'));
     els.mute.addEventListener('click', () => {
       state.muted = !state.muted;
       store.set(STORAGE.muted, state.muted);
@@ -834,6 +852,15 @@
     showDetail(state.team[0]?.id ?? 1);
   }
 
+  if (ROGUE) {
+    document.body.classList.add('rogue-pick');
+    document.title = 'Rogue Run · Choose 3';
+    els.title.textContent = 'Rogue Run';
+    const run = Rogue.getRun();
+    els.subtitle.innerHTML = 'Pick 3 one-star (<b class="stars">★</b>) Pokémon with no shared types to start your run'
+      + (run && !run.over ? ` · <b>starting replaces your current run (${run.wins} win${run.wins === 1 ? '' : 's'})</b>` : '')
+      + ' · <a href="rogue.html">Back</a>';
+  }
   renderGens();
   renderTypeOptions();
   renderStatRows();

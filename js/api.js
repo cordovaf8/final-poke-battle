@@ -59,6 +59,35 @@ const PokeAPI = (() => {
     bstSaveTimer = setTimeout(() => writeCache(BST_CACHE_KEY, bstCache), 500);
   }
   const cachedBst = id => bstCache[id];
+  // Star rating from the base stat total: under 350 is 1★ (Caterpie, Pichu), 600+ is 5★
+  // (pseudo-legendaries and most legendaries).
+  const STAR_STEPS = [350, 450, 525, 600];
+  const starsOf = bst => 1 + STAR_STEPS.filter(min => bst >= min).length;
+  // The base stat total range [min, max] of an n-star Pokémon.
+  const starRange = n => [n <= 1 ? 0 : STAR_STEPS[n - 2], n >= 5 ? Infinity : STAR_STEPS[n - 1] - 1];
+
+  // Up to count random Pokémon IDs whose base stat total falls in [min, max]. Totals cached from
+  // earlier visits are used first; the rest are looked up a batch at a time (at most 240 lookups).
+  async function pickByBst(count, [min, max], exclude = []) {
+    const ids = Array.from({ length: MAX_ID }, (_, i) => i + 1).filter(id => !exclude.includes(id));
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    const inRange = id => bstCache[id] != null && bstCache[id] >= min && bstCache[id] <= max;
+    const picks = ids.filter(inRange).slice(0, count);
+    for (let i = 0; picks.length < count && i < ids.length && i < 240; i += 12) {
+      const batch = ids.slice(i, i + 12).filter(id => bstCache[id] == null);
+      await Promise.allSettled(batch.map(loadBst));
+      batch.forEach(id => picks.length < count && inRange(id) && picks.push(id));
+    }
+    return picks;
+  }
+  // Gold stars for the rating with the rest dimmed, out of 5.
+  const starsHtml = bst => {
+    const n = starsOf(bst);
+    return `<span class="stars" title="${n} of 5 stars (base stat total ${bst})">${'★'.repeat(n)}<span class="stars-dim">${'★'.repeat(5 - n)}</span></span>`;
+  };
   async function loadBst(id) {
     if (bstCache[id] == null) await loadDetails(id);
     return bstCache[id];
@@ -202,6 +231,8 @@ const PokeAPI = (() => {
   }
 
   return {
-    TYPES, GENERATIONS, loadIndex, loadDetails, loadMove, loadBst, cachedBst, loadNextStages, spriteSources, prettyName,
+    TYPES, GENERATIONS, loadIndex, loadDetails, loadMove, loadBst, cachedBst, starsOf, starRange, starsHtml, pickByBst,
+    loadNextStages,
+    spriteSources, prettyName,
   };
 })();

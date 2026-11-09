@@ -317,6 +317,11 @@ img { image-rendering: pixelated; }
   white-space: nowrap;
 }
 .card-types { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+.card-meta { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.card-stars { font-size: 12px; line-height: 1; }
+/* Star ratings: gold for the rating, the rest dimmed (also used in the details panel). */
+.stars { color: #ffd23f; letter-spacing: 1px; white-space: nowrap; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5); }
+.stars-dim { color: rgba(255, 255, 255, 0.18); text-shadow: none; }
 .card-cost { font-size: 11px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .card-cost.low { color: #6bd96b; }
 .card-cost.mid { color: var(--accent); }
@@ -536,6 +541,9 @@ img { image-rendering: pixelated; }
 .podium-types { display: flex; gap: 4px; }
 .overlay-note { margin: 22px 0 16px; color: var(--muted); font-size: 14px; }
 .overlay-actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.btn.rogue-btn { background: linear-gradient(135deg, #3fd6a6, #2a8bd8); color: #04161a; box-shadow: 0 4px 0 #1d5f73; }
+.rogue-pick .brand h1 { color: #5ff0c2; }
+.brand p a { color: inherit; }
 .btn.tower-btn { background: linear-gradient(135deg, #c77dff, #6f8bff); color: #fff; box-shadow: 0 4px 0 #4b3a8f; }
 .overlay-sub { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
 

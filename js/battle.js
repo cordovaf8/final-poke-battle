@@ -12,8 +12,16 @@
     ? Math.min(Math.max(Number(params.get('floor')) || 1, 1), Tower.FLOORS.length)
     : 0;
   const floorInfo = towerFloor ? Tower.FLOORS[towerFloor - 1] : null;
-  // Foe gauges fill a little slower than yours, since you need time to work the menus; tower floors speed them up.
-  const ENEMY_ATB_SCALE = floorInfo ? floorInfo.atbScale : 1.3;
+  // battle.html?mode=rogue fights the next battle of the current Rogue run. With no run, or a die
+  // roll still owed for the last win, it's back to the run screen.
+  const rogueRun = params.get('mode') === 'rogue' ? Rogue.getRun() : null;
+  if (params.get('mode') === 'rogue' && (!rogueRun || rogueRun.over || rogueRun.pendingRoll || rogueRun.offer)) {
+    location.replace('rogue.html');
+    return;
+  }
+  // Foe gauges fill a little slower than yours, since you need time to work the menus; tower floors
+  // and Rogue runs speed them up as you go.
+  const ENEMY_ATB_SCALE = floorInfo ? floorInfo.atbScale : rogueRun ? Rogue.atbScale(rogueRun.wins) : 1.3;
   const ITEM_SPRITES = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items';
   const ITEMS = [
     { id: 'potion', name: 'Potion', qty: 5, target: 'ally', heal: 20, text: 'Restores 20 HP to one Pokémon.' },
@@ -97,6 +105,8 @@
   const article = word => (/^[aeiou]/i.test(word) ? 'an' : 'a');
   const attr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const typeBadge = t => `<span class="type" style="--type: var(--${t})">${t}</span>`;
+  // Type badges followed by the 1–5 star rating from base stats.
+  const typeLine = f => f.types.map(typeBadge).join('') + PokeAPI.starsHtml(Object.values(f.base).reduce((a, b) => a + b, 0));
   // Seconds for a full gauge: base Speed sets it, then Speed stages and paralysis adjust it.
   const atbDuration = (f, scale = 1) => (gsap.utils.clamp(2, 7, 300 / (f.base.speed || 50)) * scale) / Combat.speedFactor(f);
   // Heavier attacks take longer to recover from: the gauge refills slower afterwards
@@ -145,28 +155,20 @@
   async function loadTeams() {
     // Opening battle.html directly (no saved team) still gives you a party to look at.
     // The saved team is re-fetched so it includes learnsets.
-    const partyIds = readTeam()?.map(p => p.id) || randomIds(3);
+    const partyIds = rogueRun?.team || readTeam()?.map(p => p.id) || randomIds(3);
     const party = await Promise.all(partyIds.map(id => PokeAPI.loadDetails(id)));
-    const enemyIds = floorInfo ? await pickByStrength(3, floorInfo.bst, partyIds) : randomIds(3, partyIds);
+    let enemyIds;
+    if (floorInfo) enemyIds = await pickByStrength(3, floorInfo.bst, partyIds);
+    else if (rogueRun) enemyIds = await pickByStrength(3, PokeAPI.starRange(Rogue.foeStars(rogueRun.wins)), partyIds);
+    else enemyIds = randomIds(3, partyIds);
     const enemies = await Promise.all(enemyIds.map(id => PokeAPI.loadDetails(id)));
     return { party, enemies };
   }
 
-  // Random Pokémon whose base stat total falls in [min, max]. Stat totals already cached
-  // from the team select screen are used first; the rest are looked up a batch at a time.
-  async function pickByStrength(count, [min, max], exclude) {
-    const ids = gsap.utils.shuffle(Array.from({ length: MAX_ID }, (_, i) => i + 1)).filter(id => !exclude.includes(id));
-    const inRange = id => {
-      const bst = PokeAPI.cachedBst(id);
-      return bst != null && bst >= min && bst <= max;
-    };
-    const picks = ids.filter(inRange).slice(0, count);
-    for (let i = 0; picks.length < count && i < ids.length && i < 240; i += 12) {
-      const batch = ids.slice(i, i + 12).filter(id => PokeAPI.cachedBst(id) == null);
-      await Promise.allSettled(batch.map(id => PokeAPI.loadBst(id)));
-      batch.forEach(id => picks.length < count && inRange(id) && picks.push(id));
-    }
-    // Should never be needed, but never leave a floor without foes.
+  // Random Pokémon whose base stat total falls in [min, max].
+  async function pickByStrength(count, range, exclude) {
+    const picks = await PokeAPI.pickByBst(count, range, exclude);
+    // Should never be needed, but never leave a battle without foes.
     if (picks.length < count) picks.push(...randomIds(count - picks.length, [...exclude, ...picks]));
     return picks;
   }
@@ -331,7 +333,7 @@
         <span class="unit-shadow"></span>
         <span class="unit-shield"></span>
         <span class="unit-status"></span>
-        <span class="unit-types">${f.types.map(typeBadge).join('')}</span>
+        <span class="unit-types">${typeLine(f)}</span>
         <img class="unit-sprite" alt="${f.name}">
       </div>`;
     return unit;
@@ -371,7 +373,7 @@
     return `
       <${open} class="unit-row ${f.side}-row unit-grid" data-i="${f.index}">
         <span class="row-name">${f.name}<span class="row-guard"></span></span>
-        <span class="row-types">${f.types.map(typeBadge).join('')}</span>
+        <span class="row-types">${typeLine(f)}</span>
         <span class="row-hp">
           <span class="num-line">
             <span class="num"><b>${f.hp}</b>/${f.maxHp}</span>
@@ -1084,9 +1086,9 @@
 
     const row = rowOf(f);
     row.querySelector('.row-name').firstChild.textContent = f.name;
-    row.querySelector('.row-types').innerHTML = f.types.map(typeBadge).join('');
+    row.querySelector('.row-types').innerHTML = typeLine(f);
     row.querySelector('.num').innerHTML = `<b>${before}</b>/${f.maxHp}`;
-    unitOf(f).querySelector('.unit-types').innerHTML = f.types.map(typeBadge).join('');
+    unitOf(f).querySelector('.unit-types').innerHTML = typeLine(f);
     if (f.side === 'party' && battle.active === f.index) els.commandTitle.textContent = f.name;
     updateHp(f);
     paintConditions(f);
@@ -1631,11 +1633,27 @@
     document.querySelectorAll('.unit-row').forEach(row => row.classList.remove('ready', 'active'));
     // Tower progress: a win unlocks the next floor, a loss sends the climb back to Floor I.
     if (floorInfo) Tower.setFloor(won ? towerFloor : 0);
+    // Rogue run: a win earns a die roll, a loss ends the run.
+    if (rogueRun) {
+      if (won) Rogue.recordWin(battle.party.filter(f => f.fainted).map(f => f.index));
+      else Rogue.endRun();
+    }
     Music.play(won ? 'victory' : 'defeat');
     gsap.delayedCall(1.5, () => showResult(won));
   }
 
   function resultCopy(won) {
+    if (rogueRun) {
+      battle.nextUrl = 'rogue.html';
+      const n = rogueRun.wins + 1;
+      const fallen = battle.party.filter(f => f.fainted).map(f => f.name);
+      const lostText = fallen.length === 1
+        ? `${fallen[0]} fainted and leaves your team. Roll the die for its replacement.`
+        : `${fallen.join(' and ')} fainted and leave your team. Roll the die twice to refill it.`;
+      return won
+        ? { title: `Battle ${n} won!`, text: fallen.length ? lostText : 'Roll the die for a chance at a new Pokémon.', button: 'Roll the die' }
+        : { title: 'Run over', text: `Your team fell in battle ${n}, after ${rogueRun.wins} win${rogueRun.wins === 1 ? '' : 's'}.`, button: 'See your run' };
+    }
     if (!floorInfo) {
       return won
         ? { title: 'Victory!', text: 'All the wild Pokémon fainted.', button: 'Battle again' }
@@ -1670,6 +1688,9 @@
   // ---------- Intro ----------
 
   function playIntro() {
+    const titleCard = floorInfo
+      ? { small: `Floor ${Tower.ROMAN[towerFloor - 1]}`, big: floorInfo.name }
+      : rogueRun && { small: 'Rogue run', big: `Battle ${rogueRun.wins + 1}` };
     const names = battle.enemies.map(f => f.name);
     const inners = list => list.map(innerOf);
     // Starts with the encounter flash (or on the first click if the browser blocked autoplay).
@@ -1695,12 +1716,12 @@
         battle.enemies.forEach((_, j) => fillEnemyAtb(j, rand(0, 0.2)));
         battle.started = true;
         [...battle.party, ...battle.enemies].forEach(f => fillEvo(f));
-      }, floorInfo ? 2.6 : 1.8);
+      }, titleCard ? 2.6 : 1.8);
 
-    // Tower floors open with a big title card.
-    if (floorInfo) {
-      els.floorTitle.querySelector('small').textContent = `Floor ${Tower.ROMAN[towerFloor - 1]}`;
-      els.floorTitle.querySelector('strong').textContent = floorInfo.name;
+    // Tower floors and Rogue battles open with a big title card.
+    if (titleCard) {
+      els.floorTitle.querySelector('small').textContent = titleCard.small;
+      els.floorTitle.querySelector('strong').textContent = titleCard.big;
       els.floorTitle.hidden = false;
       gsap.timeline({ delay: 0.3, onComplete: () => { els.floorTitle.hidden = true; } })
         .fromTo(els.floorTitle, { scale: 1.6, opacity: 0, filter: 'blur(8px)' }, { scale: 1, opacity: 1, filter: 'blur(0px)', duration: 0.5, ease: 'power3.out' })
@@ -1714,6 +1735,12 @@
       els.field.dataset.biome = pick(BIOMES);
       buildScenery();
       buildMotes();
+      if (rogueRun) {
+        els.loading.innerHTML = `Rogue run · Battle ${rogueRun.wins + 1}<span class="dots"></span>`;
+        els.backBtn.textContent = '← Rogue run';
+        els.backBtn.href = 'rogue.html';
+        document.title = `Rogue run · Battle ${rogueRun.wins + 1}`;
+      }
       return;
     }
     els.field.dataset.biome = 'tower';

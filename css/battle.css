@@ -274,7 +274,12 @@ body.evolving :is(.plates, .command-panel) * { visibility: hidden !important; }
 
 /* In Advanced view the types sit inside the nameplate instead; the bottom panel rows don't show them. */
 .row-types { display: none; }
-.plate .row-types { display: flex; gap: 3px; }
+.plate .row-types { display: flex; align-items: center; gap: 3px; }
+/* Star rating (1–5, from base stats) after the type badges; dimmed stars fill it out to 5. */
+.stars { font-size: 10px; line-height: 1; letter-spacing: 0; color: #ffd23f; white-space: nowrap; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); }
+.stars-dim { color: rgba(255, 255, 255, 0.22); text-shadow: none; }
+.plate .stars { margin-left: auto; font-size: 9px; }
+.unit-types .stars { align-self: center; margin-left: 2px; font-size: 11px; }
 .plate .row-types .type { font-size: 9px; padding: 1px 6px; }
 
 /* Status conditions: an icon over the sprite plus a tint/glow. */

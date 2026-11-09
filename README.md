@@ -27,6 +27,15 @@ An internet connection is needed, since Pokémon data, sprites and cries are loa
 
 - Browse every Pokémon (#1–1025) by generation, type or name/number search.
 - Hover a Pokémon for its stats, abilities and Pokédex entry (on phones, tap it).
+- Every Pokémon has a **1–5 star rating** from its base stat total, shown on its card, in its details and in battle:
+
+  | Stars | Base stat total | For example |
+  | --- | --- | --- |
+  | ★☆☆☆☆ | under 350 | Caterpie, Bulbasaur, Pidgeotto |
+  | ★★☆☆☆ | 350–449 | Ivysaur, Wartortle, Butterfree |
+  | ★★★☆☆ | 450–524 | Raichu, Pidgeot, Chimecho |
+  | ★★★★☆ | 525–599 | Venusaur, Charizard, Blastoise |
+  | ★★★★★ | 600 and up | Dragonite, Garchomp, Mewtwo |
 - Click to add it to your team, and click a team slot to remove it. **Random** builds a legal team for you.
 
 Team rules:
@@ -41,7 +50,7 @@ Cards that would break a rule are dimmed, and hovering one shows the reason. Pre
 
 ### 2. Battle
 
-Your team is on the left and the wild Pokémon are on the right, with each Pokémon's types shown above it so you can plan matchups at a glance. Every Pokémon has an **ATB gauge** that fills in real time based on its Speed. Wild Pokémon act on their own as soon as their gauge fills.
+Your team is on the left and the wild Pokémon are on the right, with each Pokémon's types and star rating shown above it so you can plan matchups at a glance. Every Pokémon has an **ATB gauge** that fills in real time based on its Speed. Wild Pokémon act on their own as soon as their gauge fills.
 
 - **Take command:** when a gauge is full, the Pokémon's name turns gold. Click its row or its sprite to command it. The first ready Pokémon is selected automatically, and you can switch between ready Pokémon without losing a turn.
 - **Commands:**
@@ -100,7 +109,7 @@ Mouse, keyboard and game controllers all work. Controllers use the standard Xbox
 
 ### 3. Battle Tower
 
-After confirming your team, choose **Wild battle** for a quick fight against three random Pokémon, or **Battle Tower** to climb four floors of trainer battles.
+After confirming your team, choose **Wild battle** for a quick fight against three random Pokémon, **Battle Tower** to climb four floors of trainer battles, or **Rogue run** (see below).
 
 | Floor | Trainer | Foe strength (BST) | Foe speed |
 | --- | --- | --- | --- |
@@ -115,6 +124,22 @@ After confirming your team, choose **Wild battle** for a quick fight against thr
 - Your team is fully healed and gets a fresh bag before each floor.
 - Progress is saved per team, so picking a different team starts a new climb. Your best result is remembered.
 - Tower battles take place in the tower's own arena, decked in each floor's colours, with their own theme music on the tower screen.
+
+### 4. Rogue run
+
+A roguelike mode: keep winning with a team that changes as you go. Losing a battle ends the run, and any Pokémon that faints along the way is gone for good.
+
+- **Start:** choose **Rogue run** after confirming a team, then **Choose your team**. Pick three **1★** Pokémon with no shared types (other Pokémon are dimmed). This starting team is kept separate from your usual team.
+- **Battles:** each battle is against three wild Pokémon. Foes get a star tougher every two wins (battles 1–2 are 1★, 3–4 are 2★, up to 5★ from battle 9), and their gauges fill a little faster each win, down to your own pace. Your team starts every battle fully healed with a fresh bag.
+- **After each win, roll the die.** It rolls 1 to 5, and you're offered a random Pokémon with that many stars, with its types and stats.
+  - Click a team member to swap it out for the new Pokémon, or choose **Keep my team**.
+  - Swaps don't have to follow the type rule, so a run can end up with shared types.
+  - The roll and the offer are saved the moment they happen, so refreshing the page can't reroll them.
+- **Fainted Pokémon are lost.** If any of your Pokémon are fainted when you win, they leave the team, and each gets a roll of its own instead of the free one.
+  - The rolled Pokémon takes the fallen one's place automatically: no swapping, no turning it down.
+  - Two fainted means two rolls, one after the other, to fill the team back up.
+- **Run over:** when your team falls, the run screen shows how many battles you won. Your best run is remembered. You can also give up a run from the run screen (it takes two clicks).
+- Evolutions during a battle still only last for that battle.
 
 ## Battle mechanics
 
@@ -175,11 +200,15 @@ After confirming your team, choose **Wild battle** for a quick fight against thr
 
 ```
 index.html       Team select screen
-battle.html      Battle screen (wild battles and tower floors)
+battle.html      Battle screen (wild battles, tower floors and Rogue runs)
 tower.html       Battle Tower screen
 css/tower.css    Battle Tower styles
 js/tower.js      Battle Tower screen: the tower, climbing, celebrations
 js/tower-data.js Tower floors and saved climb progress
+rogue.html       Rogue run screen
+css/rogue.css    Rogue run styles
+js/rogue.js      Rogue run screen: the die roll, offers and swaps
+js/rogue-data.js Saved Rogue run: team, wins, rolls and foe scaling
 css/style.css    Team select styles
 css/battle.css   Battle styles
 js/api.js        PokéAPI requests, caching, sprites and learnsets
