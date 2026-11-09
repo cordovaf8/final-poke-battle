@@ -88,7 +88,7 @@
   // How far the commanded Pokémon steps toward the enemy (px).
   const STEP_FORWARD = 28;
 
-  // party / enemies hold fighters (see Combat.createFighter). ready: party indexes with a full gauge, in fill order.
+  // party / enemies hold fighters (see Combat.createFighter). ready: party indexes with at least one ATB charge, in fill order.
   const battle = {
     party: [], enemies: [], units: [], enemyUnits: [],
     ready: [], active: null, targeting: null, over: false,
@@ -107,17 +107,23 @@
   const typeBadge = t => `<span class="type" style="--type: var(--${t})">${t}</span>`;
   // Type badges followed by the 1–5 star rating from base stats.
   const typeLine = f => f.types.map(typeBadge).join('') + PokeAPI.starsHtml(Object.values(f.base).reduce((a, b) => a + b, 0));
-  // Seconds for a full gauge: base Speed sets it, then Speed stages and paralysis adjust it.
-  const atbDuration = (f, scale = 1) => (gsap.utils.clamp(2, 7, 300 / (f.base.speed || 50)) * scale) / Combat.speedFactor(f);
-  // Heavier attacks take longer to recover from: the gauge refills slower afterwards
-  // (40 power ≈ ×0.87, 90 ≈ ×1.2, 150 ≈ ×1.6).
-  const RECOVERY = { defend: 0.7, item: 1, status: 0.8, evolve: 0.8 };
+  // The ATB gauge is split into three charges that fill one after another, and every action spends some.
+  const ATB_CHARGES = 3;
+  // Seconds to fill one charge: base Speed sets it, then Speed stages and paralysis adjust it.
+  const chargeSeconds = f => (gsap.utils.clamp(2, 7, 300 / (f.base.speed || 50)) * 0.6
+    * (f.side === 'enemy' ? ENEMY_ATB_SCALE : 1)) / Combat.speedFactor(f);
+  // Charges an attack costs, by power: under 55 costs 1, 55–85 costs 2, 90 and up costs 3
+  // (no listed power counts as 60, as in the damage formula). Status moves cost 1, as do Defend,
+  // items and Evolve.
+  const moveCost = move => {
+    if (move.category === 'status') return 1;
+    const power = move.power ?? 60;
+    return power < 55 ? 1 : power < 90 ? 2 : 3;
+  };
+  const EVOLVE = 'evolve'; // a foe's planned action when it's about to evolve
   // Evolution gauge: fills over about this many seconds of battle, faster when landing or taking hits.
-  const EVO_SECONDS = 37.5;
+  const EVO_SECONDS = 30;
   const ENEMY_EVO_SCALE = 1.25;
-  const recoveryFactor = move => (move.category === 'status'
-    ? RECOVERY.status
-    : gsap.utils.clamp(0.8, 1.8, 0.6 + (move.power ?? 60) / 150));
   const living = list => list.filter(f => !f.fainted);
 
   // A fighter's HUD row moves between the bottom panel and its nameplate depending on the view.
@@ -383,7 +389,7 @@
           <span class="bar hp"><i></i></span>
           <span class="bar evo" hidden><i></i></span>
         </span>
-        <span class="bar atb"><i></i></span>
+        <span class="bar atb">${'<span class="seg"><i></i></span>'.repeat(ATB_CHARGES)}</span>
       </${party ? 'button' : 'div'}>`;
   }
 
@@ -392,6 +398,7 @@
     els.enemyRows.innerHTML = battle.enemies.map(unitRow).join('');
     battle.party.forEach((f, i) => { f.row = els.partyRows.children[i]; });
     battle.enemies.forEach((f, i) => { f.row = els.enemyRows.children[i]; });
+    [...battle.party, ...battle.enemies].forEach(f => { f.gauge ||= { value: 0, counted: 0 }; });
   }
 
   // ---------- Views ----------
@@ -504,19 +511,67 @@
 
   // ---------- Real-time ATB ----------
 
-  function fillAtb(f, duration, from, onFull) {
+  // f.gauge.value runs from 0 to ATB_CHARGES; each whole number is a charge ready to spend.
+  // counted remembers how many charges have already been announced (see chargeGained).
+  const charges = f => Math.floor(f.gauge.value + 1e-6);
+
+  function paintGauge(f) {
     const bar = rowOf(f).querySelector('.atb');
-    bar.classList.remove('full');
-    f.atbTween = gsap.fromTo(bar.firstElementChild, { scaleX: from }, {
-      scaleX: 1,
-      duration: duration * (1 - from),
+    const value = f.gauge.value;
+    bar.querySelectorAll('.seg').forEach((seg, k) => {
+      seg.firstElementChild.style.transform = `scaleX(${gsap.utils.clamp(0, 1, value - k)})`;
+      seg.classList.toggle('on', value >= k + 1 - 1e-6);
+    });
+    bar.classList.toggle('full', value >= ATB_CHARGES - 1e-6);
+  }
+
+  // Fills the gauge from where it stands towards all three charges. It stops while the Pokémon acts.
+  function runGauge(f) {
+    stopGauge(f);
+    const g = f.gauge;
+    if (f.fainted || f.acting || battle.over || g.value >= ATB_CHARGES) return;
+    f.drainTween?.progress(1);
+    f.filling = true;
+    f.atbTween = gsap.to(g, {
+      value: ATB_CHARGES,
+      duration: (ATB_CHARGES - g.value) * chargeSeconds(f),
       ease: 'none',
       paused: battle.paused,
-      onComplete() {
-        bar.classList.add('full');
-        onFull();
+      onUpdate() {
+        paintGauge(f);
+        if (charges(f) > g.counted) {
+          g.counted = charges(f);
+          chargeGained(f);
+        }
       },
+      onComplete() { f.filling = false; },
     });
+  }
+
+  function stopGauge(f) {
+    f.atbTween?.kill();
+    f.filling = false;
+  }
+
+  // Spends or loses charges: the gauge drops to `value` (keeping any part-filled charge) with a quick drain.
+  function drainGauge(f, value = 0) {
+    stopGauge(f);
+    f.drainTween?.kill();
+    value = Math.max(0, value);
+    f.gauge.counted = Math.floor(value + 1e-6);
+    f.drainTween = gsap.to(f.gauge, { value, duration: 0.25, ease: 'power2.in', onUpdate: () => paintGauge(f) });
+  }
+
+  // Speed changes (stages, paralysis) apply to the fill already under way.
+  function retimeGauge(f) {
+    if (f.filling) runGauge(f);
+  }
+
+  // Each charge that fills counts as a turn for status conditions; then it's there to spend.
+  function chargeGained(f) {
+    if (!startTurn(f)) return;
+    if (f.side === 'party') readyUp(f);
+    else enemyThink(f.index);
   }
 
   function setPaused(paused) {
@@ -532,43 +587,25 @@
         if (!f.fainted) f.evo?.tween?.resume();
       }
     });
-    if (!paused) battle.pending.splice(0).forEach(enemyAct);
+    if (!paused) battle.pending.splice(0).forEach(enemyThink);
   }
 
-  function drainAtb(row) {
-    const bar = row.querySelector('.atb');
-    const fill = bar.firstElementChild;
-    bar.classList.remove('full');
-    gsap.killTweensOf(fill);
-    gsap.to(fill, { scaleX: 0, duration: 0.25, ease: 'power2.in' });
+  // A party member with a charge to spend joins the queue for orders.
+  function readyUp(f) {
+    const i = f.index;
+    if (f.fainted || f.acting || battle.over || charges(f) < 1) return;
+    if (battle.active === i) paintMoveCosts();
+    if (battle.ready.includes(i)) return;
+    rowOf(f).classList.add('ready');
+    battle.ready.push(i);
+    if (battle.active == null) activate(i);
   }
 
-  function fillPartyAtb(i, from = 0, factor = 1) {
-    const f = battle.party[i];
-    if (f.fainted || battle.over) return;
-    const row = rowOf(f);
-    row.classList.remove('ready');
-    fillAtb(f, atbDuration(f, factor), from, () => {
-      if (f.fainted || battle.over || !startTurn(f)) return;
-      row.classList.add('ready');
-      battle.ready.push(i);
-      if (battle.active == null) activate(i);
-    });
-  }
-
-  function fillEnemyAtb(j, from = 0, factor = 1) {
-    const f = battle.enemies[j];
-    if (f.fainted || battle.over) return;
-    fillAtb(f, atbDuration(f, ENEMY_ATB_SCALE * factor), from, () => gsap.delayedCall(rand(0.2, 0.7), () => enemyAct(j)));
-  }
-
-  const refillAtb = (f, factor = 1) => (f.side === 'party' ? fillPartyAtb(f.index, 0, factor) : fillEnemyAtb(f.index, 0, factor));
-
-  // Runs each time a gauge fills: poison/burn damage, then sleep, freeze or paralysis may cost the turn.
+  // Runs each time a charge fills: poison/burn damage, then sleep, freeze or paralysis may cost the charge.
   function startTurn(f) {
     if (f.status === 'burn' || f.status === 'poison') {
       const burn = f.status === 'burn';
-      const damage = Math.max(1, Math.floor(f.maxHp / (burn ? 16 : 8)));
+      const damage = Math.max(1, Math.floor(f.maxHp / (burn ? 24 : 12)));
       Fx.ailment(imgOf(f), f.status);
       blink(imgOf(f));
       popup(f, damage, 'damage', burn ? 'Burn' : 'Poison');
@@ -580,7 +617,7 @@
       if (f.sleepTurns > 0) return loseTurn(f, `${displayName(f)} is fast asleep.`);
       cure(f, `${displayName(f)} woke up!`);
     } else if (f.status === 'freeze') {
-      if (Math.random() >= 0.2) return loseTurn(f, `${displayName(f)} is frozen solid!`);
+      if (Math.random() >= 0.12) return loseTurn(f, `${displayName(f)} is frozen solid!`);
       cure(f, `${displayName(f)} thawed out!`);
     } else if (f.status === 'paralysis' && Math.random() < 0.25) {
       return loseTurn(f, `${displayName(f)} is paralyzed! It can't move!`);
@@ -588,17 +625,22 @@
     return true;
   }
 
+  // The charge that just filled is lost.
   function loseTurn(f, text) {
     showMessage(text);
     popup(f, STATUS_INFO[f.status].tag, 'status');
     Fx.ailment(imgOf(f), f.status);
-    drainAtb(rowOf(f));
-    gsap.delayedCall(0.8, () => refillAtb(f));
+    drainGauge(f, f.gauge.counted - 1);
+    gsap.delayedCall(0.8, () => runGauge(f));
     return false;
   }
 
-  // Sleep or freeze landing on a party member who's waiting for orders takes the turn away.
+  // Sleep or freeze wipes out stored charges, and a party member waiting for orders loses the menu.
   function interruptTurn(f) {
+    if (f.fainted) return;
+    f.plan = null;
+    drainGauge(f, 0);
+    gsap.delayedCall(0.3, () => runGauge(f));
     if (f.side !== 'party' || !battle.ready.includes(f.index)) return;
     battle.ready = battle.ready.filter(r => r !== f.index);
     rowOf(f).classList.remove('ready');
@@ -607,8 +649,6 @@
       battle.active = null;
       closeMenus();
     }
-    drainAtb(rowOf(f));
-    refillAtb(f);
     activateNext();
   }
 
@@ -647,9 +687,9 @@
     gsap.fromTo(rowOf(f), { x: -6 }, { x: 0, duration: 0.45, ease: 'elastic.out(1.2, 0.3)' });
   }
 
-  // Spends the active Pokémon's turn: plays its animation, then its gauge refills
-  // at a speed scaled by how heavy the action was.
-  function endTurn(text, factor, animate) {
+  // Spends `cost` of the active Pokémon's charges and plays its animation. Its gauge carries on
+  // filling afterwards, and if it still has a charge left it's ready for orders again.
+  function endTurn(text, cost, animate) {
     const i = battle.active;
     if (i == null) return;
     const f = battle.party[i];
@@ -659,10 +699,17 @@
     showMessage(text);
     standDown(i, false);
     rowOf(f).classList.remove('ready');
-    drainAtb(rowOf(f));
+    f.acting = true;
+    drainGauge(f, f.gauge.value - cost);
 
     const unit = unitOf(f);
-    const tl = gsap.timeline({ onComplete: () => fillPartyAtb(i, 0, factor) });
+    const tl = gsap.timeline({
+      onComplete() {
+        f.acting = false;
+        runGauge(f);
+        readyUp(f);
+      },
+    });
     animate?.(tl, unit);
     tl.to(innerOf(unit), { x: 0, duration: 0.3, ease: 'power2.inOut' });
 
@@ -809,19 +856,22 @@
     } else {
       if (!Combat.canReceiveStatus(f, ailment)) return false;
       f.status = ailment;
-      if (ailment === 'sleep') f.sleepTurns = 2 + Math.floor(Math.random() * 3); // sleeps through 1–3 turns
+      if (ailment === 'sleep') f.sleepTurns = 3 + Math.floor(Math.random() * 3); // sleeps through 2–4 charges
       popup(f, STATUS_INFO[ailment].tag, 'status');
       Fx.ailment(imgOf(f), ailment);
       showMessage(`${displayName(f)} ${STATUS_INFO[ailment].text}`);
       if (ailment === 'sleep' || ailment === 'freeze') interruptTurn(f);
+      if (ailment === 'paralysis') retimeGauge(f);
     }
     paintConditions(f);
     return true;
   }
 
   function cure(f, text) {
+    const paralyzed = f.status === 'paralysis';
     f.status = null;
     f.sleepTurns = 0;
+    if (paralyzed) retimeGauge(f);
     paintConditions(f);
     if (text) showMessage(text);
   }
@@ -836,6 +886,7 @@
     const up = applied.some(a => a.delta > 0);
     popup(f, parts.join(' '), up ? 'buff' : 'debuff');
     if (applied.some(a => a.delta !== 0)) Fx.stat(imgOf(f), up);
+    if (applied.some(a => a.stat === 'speed' && a.delta)) retimeGauge(f);
     paintConditions(f);
     return applied.some(a => a.delta !== 0);
   }
@@ -886,8 +937,8 @@
     shake(target);
     popup(target, damage, result.crit ? 'damage crit' : 'damage', notes.join(' · '));
     setHp(target, target.hp - damage);
-    chargeEvo(attacker, 0.048);
-    chargeEvo(target, (damage / target.maxHp) * 0.36);
+    chargeEvo(attacker, 0.06);
+    chargeEvo(target, (damage / target.maxHp) * 0.45);
     applySecondary(attacker, target, move, damage);
   }
 
@@ -904,32 +955,65 @@
     row.querySelector('.row-guard').textContent = f.guards > 0 ? `🛡${f.guards}` : '';
   }
 
+  const planCost = plan => (plan === EVOLVE ? 1 : moveCost(plan));
+
+  // Foes pick their next action as soon as they have a charge, then wait until they've saved up
+  // enough charges to pay for it. One that can evolve does that first.
+  function enemyThink(j) {
+    const f = battle.enemies[j];
+    if (f.fainted || f.acting || f.thinking || battle.over || charges(f) < 1) return;
+    if (battle.paused) {
+      if (!battle.pending.includes(j)) battle.pending.push(j);
+      return;
+    }
+    if (f.evo?.ready) f.plan = EVOLVE;
+    else f.plan ||= chooseEnemyMove(f);
+    if (charges(f) < planCost(f.plan)) return;
+    f.thinking = true;
+    gsap.delayedCall(rand(0.2, 0.7), () => {
+      f.thinking = false;
+      enemyAct(j);
+    });
+  }
+
   function enemyAct(j) {
     const f = battle.enemies[j];
-    if (f.fainted || battle.over) return;
+    if (f.fainted || f.acting || battle.over) return;
     if (battle.paused) {
-      battle.pending.push(j);
+      if (!battle.pending.includes(j)) battle.pending.push(j);
       return;
     }
-    if (!startTurn(f)) return;
-    if (f.evo?.ready) {
-      evolve(f, () => fillEnemyAtb(j, 0, RECOVERY.evolve));
+    const move = f.plan;
+    // Sleep or freeze may have wiped the charges out since the plan was made.
+    if (!move || charges(f) < planCost(move) || (move === EVOLVE && !f.evo?.ready)) {
+      f.plan = null;
+      enemyThink(j);
       return;
     }
-    const move = chooseEnemyMove(f);
-    const scope = moveScope(move);
+    const scope = move === EVOLVE ? 'self' : moveScope(move);
     const target = scope === 'self' ? f : pick(living(battle.party));
     if (!target) return;
+    f.plan = null;
+    f.acting = true;
+    drainGauge(f, f.gauge.value - planCost(move));
+    const resume = () => {
+      f.acting = false;
+      runGauge(f);
+      enemyThink(j);
+    };
+    if (move === EVOLVE) {
+      evolve(f, resume);
+      return;
+    }
     const row = rowOf(f);
     showMessage(`${displayName(f)} used ${move.name}!`);
     row.classList.add('acting');
-    drainAtb(row);
 
     const unit = unitOf(f);
     const tl = gsap.timeline({
       onComplete() {
         row.classList.remove('acting');
-        fillEnemyAtb(j, 0, recoveryFactor(move));
+        resume();
       },
     });
     perform(tl, f, target, move);
@@ -957,7 +1041,8 @@
     row.classList.remove('ready', 'active', 'acting');
     unit.classList.remove('active');
     unit.classList.add('fainted');
-    drainAtb(row);
+    f.plan = null;
+    drainGauge(f, 0);
     showMessage(`${displayName(f)} fainted!`);
 
     if (f.side === 'enemy') {
@@ -987,7 +1072,7 @@
     gsap.to(imgOf(f), { filter: 'grayscale(0) brightness(1)', opacity: 1, duration: 0.5, clearProps: 'filter' });
     Fx.heal(imgOf(f));
     setHp(f, Math.floor(f.maxHp / 2));
-    fillPartyAtb(f.index);
+    runGauge(f);
     if (battle.started) fillEvo(f, evoProgress(f));
   }
 
@@ -1068,7 +1153,7 @@
   function chooseEvolve() {
     const f = battle.party[battle.active];
     if (!f?.evo?.ready) return;
-    endTurn(`What? ${f.name} is evolving!`, RECOVERY.evolve);
+    endTurn(`What? ${f.name} is evolving!`, 1);
     evolve(f);
   }
 
@@ -1111,8 +1196,6 @@
     world.pause();
     battle.evolving = f;
     f.evo.tween?.kill();
-    gsap.set(rowOf(f).querySelector('.atb i'), { scaleX: 0 });
-    rowOf(f).querySelector('.atb').classList.remove('full');
     document.body.classList.add('evolving');
     unit.classList.add('evolving');
     unit.classList.remove('can-evolve');
@@ -1196,12 +1279,17 @@
       showMessage(`${move.name} is out of PP!`);
       return;
     }
+    const cost = moveCost(move);
+    if (cost > charges(f)) {
+      showMessage(`${move.name} needs ${cost} ATB charges. ${f.name} has ${charges(f)}.`);
+      return;
+    }
     const text = `${f.name} used ${move.name}!`;
     const scope = moveScope(move);
     // Only single-target moves need a target picked; self and all-foe moves go straight off.
     if (scope !== 'foe') {
       move.ppLeft -= 1;
-      endTurn(text, recoveryFactor(move), tl => perform(tl, f, null, move));
+      endTurn(text, cost, tl => perform(tl, f, null, move));
       return;
     }
     beginTargeting({
@@ -1209,7 +1297,7 @@
       candidates: () => living(battle.enemies),
       onConfirm(target) {
         move.ppLeft -= 1;
-        endTurn(text, recoveryFactor(move), tl => perform(tl, f, target, move));
+        endTurn(text, cost, tl => perform(tl, f, target, move));
       },
     });
   }
@@ -1226,7 +1314,7 @@
     const text = target === user
       ? `${user.name} used ${article(item.name)} ${item.name}!`
       : `Used ${article(item.name)} ${item.name} on ${target.name}!`;
-    endTurn(text, RECOVERY.item, tl => tl.add(() => {
+    endTurn(text, 1, tl => tl.add(() => {
       if (item.heal) {
         heal(target, item.heal);
       } else if (item.id === 'full-heal') {
@@ -1269,7 +1357,7 @@
     // Resets (doesn't stack) to a fresh set of guarded hits.
     f.guards = Combat.GUARD_CHARGES;
     showGuard(f);
-    endTurn(`${f.name} braces for the next ${Combat.GUARD_CHARGES} hits!`, RECOVERY.defend, (tl, unit) => {
+    endTurn(`${f.name} braces for the next ${Combat.GUARD_CHARGES} hits!`, 1, (tl, unit) => {
       const shield = unit.querySelector('.unit-shield');
       tl.fromTo(shield, { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.25, ease: 'back.out(2)' })
         .to(shield, { opacity: 0.45, duration: 0.4, clearProps: 'opacity,transform' });
@@ -1384,6 +1472,7 @@
 
   function openSubmenu(menu) {
     if (menu === els.itemMenu) renderItems();
+    if (menu === els.attackMenu) paintMoveCosts();
     setPaused(true);
     menu.classList.add('open');
     els.commandPanel.classList.add('expanded');
@@ -1421,21 +1510,35 @@
     const moves = await loadMoves(battle.party[i]);
     if (battle.active !== i) return;
     els.moveList.innerHTML = moves.map((m, index) => {
-      const factor = recoveryFactor(m);
+      const cost = moveCost(m);
       const meta = [
         capitalize(m.type), capitalize(m.category), `Power ${m.power ?? '—'}`,
-        `Acc ${m.accuracy ? `${m.accuracy}%` : '—'}`, `ATB refill ×${factor.toFixed(2)}`,
+        `Acc ${m.accuracy ? `${m.accuracy}%` : '—'}`, `Costs ${cost} ATB charge${cost === 1 ? '' : 's'}`,
       ].join(' · ');
       return `
-        <button type="button" class="menu-item move${m.ppLeft <= 0 ? ' disabled' : ''}" role="menuitem"
+        <button type="button" class="menu-item move" role="menuitem" data-cost="${cost}"
           data-action="move" data-index="${index}" data-meta="${attr(`${m.name} — ${meta}`)}" data-help="${attr(m.effect)}">
           <span class="mv-name">${m.name}</span>${typeBadge(m.type)}
-          <span class="mv-pow${factor > 1.2 ? ' heavy' : ''}">${m.power ?? '—'}</span>
+          <span class="mv-cost" title="ATB cost">${'<i></i>'.repeat(cost)}</span>
+          <span class="mv-pow">${m.power ?? '—'}</span>
           <span class="mv-pp">${m.ppLeft}/${m.pp}</span>
         </button>`;
     }).join('') + '<span class="pointer"></span>';
     bobPointer(els.moveList.querySelector('.pointer'));
+    paintMoveCosts();
     if (els.attackMenu.classList.contains('open')) focusItem(els.attackMenu);
+  }
+
+  // Greys out attacks the active Pokémon can't pay for yet (or has no PP left for).
+  function paintMoveCosts() {
+    const f = battle.party[battle.active];
+    if (!f?.moves) return;
+    els.moveList.querySelectorAll('.menu-item.move').forEach(item => {
+      const move = f.moves[item.dataset.index];
+      const short = Number(item.dataset.cost) > charges(f);
+      item.classList.toggle('short', short);
+      item.classList.toggle('disabled', short || move.ppLeft <= 0);
+    });
   }
 
   function renderItems() {
@@ -1629,7 +1732,7 @@
     if (battle.active != null) standDown(battle.active, true);
     battle.active = null;
     battle.ready = [];
-    document.querySelectorAll('.atb i').forEach(fill => gsap.killTweensOf(fill));
+    [...battle.party, ...battle.enemies].forEach(stopGauge);
     document.querySelectorAll('.unit-row').forEach(row => row.classList.remove('ready', 'active'));
     // Tower progress: a win unlocks the next floor, a loss sends the climb back to Floor I.
     if (floorInfo) Tower.setFloor(won ? towerFloor : 0);
@@ -1712,8 +1815,10 @@
         ? `${floorInfo.trainer} sends out ${names.slice(0, -1).join(', ')} and ${names.at(-1)}!`
         : `Wild ${names.slice(0, -1).join(', ')} and ${names.at(-1)} appeared!`), 1.2)
       .add(() => {
-        battle.party.forEach((_, i) => fillPartyAtb(i, rand(0, 0.35)));
-        battle.enemies.forEach((_, j) => fillEnemyAtb(j, rand(0, 0.2)));
+        // Everyone starts part of the way to their first charge.
+        battle.party.forEach(f => { f.gauge.value = rand(0, 0.9); });
+        battle.enemies.forEach(f => { f.gauge.value = rand(0, 0.5); });
+        [...battle.party, ...battle.enemies].forEach(runGauge);
         battle.started = true;
         [...battle.party, ...battle.enemies].forEach(f => fillEvo(f));
       }, titleCard ? 2.6 : 1.8);

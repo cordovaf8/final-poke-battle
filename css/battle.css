@@ -698,8 +698,25 @@ body.targeting .unit, body.targeting .enemy-row { cursor: pointer; }
 }
 .bar i { display: block; height: 100%; transform-origin: left; }
 .bar.hp i { background: linear-gradient(90deg, #3a7bff, var(--hp)); }
-.bar.atb { height: 10px; }
-.bar.atb i { background: linear-gradient(90deg, #b8862d, var(--atb)); transform: scaleX(0); }
+/* The ATB gauge: three charges side by side. A full charge lights up; all three blink. */
+.bar.atb {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  height: 10px;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+}
+.bar.atb .seg {
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+.bar.atb i { background: linear-gradient(90deg, #8a6420, #c99a35); transform: scaleX(0); }
+.bar.atb .seg.on i { background: linear-gradient(90deg, #b8862d, var(--atb)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45); }
 .bar.atb.full i { animation: atb-ready 0.6s steps(2) infinite; }
 @keyframes atb-ready { 50% { background: #fff6c8; } }
 .enemy-row .bar.hp i { background: linear-gradient(90deg, #d8434f, #ff8a6b); }
@@ -710,7 +727,8 @@ body.targeting .unit, body.targeting .enemy-row { cursor: pointer; }
 .bar.evo.full i { animation: evo-ready 1s ease-in-out infinite; }
 @keyframes evo-ready { 50% { background: #ffffff; box-shadow: 0 0 6px #bdf2ff; } }
 .plate .bar.evo { height: 4px; }
-.enemy-row .bar.atb i { background: linear-gradient(90deg, #8e3a9e, #e27ad8); }
+.enemy-row .bar.atb i { background: linear-gradient(90deg, #6a2c78, #a5579f); }
+.enemy-row .bar.atb .seg.on i { background: linear-gradient(90deg, #8e3a9e, #e27ad8); }
 
 /* ---------- Command panel ---------- */
 
@@ -801,10 +819,19 @@ body.targeting .pane.open { opacity: 0.55; }
   gap: 8px;
   font-size: 15px;
 }
-.menu-item.move { grid-template-columns: minmax(0, 1fr) auto 28px 44px; }
+.menu-item.move { grid-template-columns: minmax(0, 1fr) auto 26px 28px 44px; }
 .menu-item.bag-item { grid-template-columns: 26px minmax(0, 1fr) 36px; }
 .mv-pow { text-align: right; font-size: 13px; color: var(--label); font-variant-numeric: tabular-nums; }
-.mv-pow.heavy { color: #ffb36b; }
+/* ATB cost: one pip per charge the attack spends. */
+.mv-cost { display: flex; justify-content: flex-end; gap: 2px; }
+.mv-cost i {
+  width: 6px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--atb);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.menu-item.short .mv-cost i { background: #7d6a3a; }
 
 /* All gauges freeze while an Attack/Items menu is open. */
 .atb-paused .bar.atb i { filter: grayscale(0.8) brightness(0.8); }

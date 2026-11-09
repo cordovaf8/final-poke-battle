@@ -50,11 +50,13 @@ Cards that would break a rule are dimmed, and hovering one shows the reason. Pre
 
 ### 2. Battle
 
-Your team is on the left and the wild Pokémon are on the right, with each Pokémon's types and star rating shown above it so you can plan matchups at a glance. Every Pokémon has an **ATB gauge** that fills in real time based on its Speed. Wild Pokémon act on their own as soon as their gauge fills.
+Your team is on the left and the wild Pokémon are on the right, with each Pokémon's types and star rating shown above it so you can plan matchups at a glance. Every Pokémon has an **ATB gauge** split into **three charges** that fill one after another in real time, based on its Speed. Every action spends charges: the strongest attacks cost 3, middling ones 2, and weak attacks, status moves, Defend, items and Evolve cost 1. Each attack shows its cost as gold pips in the attack list.
 
-- **Take command:** when a gauge is full, the Pokémon's name turns gold. Click its row or its sprite to command it. The first ready Pokémon is selected automatically, and you can switch between ready Pokémon without losing a turn.
+- **Take command:** once a Pokémon has at least one charge, its name turns gold. Click its row or its sprite to command it. The first ready Pokémon is selected automatically, and you can switch between ready Pokémon without losing anything.
+- **Save up or spend:** charges keep filling while a Pokémon waits, up to three. Use cheap moves as soon as a charge is ready, or wait and spend all three on a big hit. A Pokémon with charges left over after acting is ready again as soon as its move finishes. The gauge doesn't fill while the Pokémon is acting.
+- **Wild Pokémon** pick an attack as soon as they have a charge, then save up until they can pay for it.
 - **Commands:**
-  - **Attack:** pick one of its level-up attacks (learned by Lv 50), then choose which wild Pokémon to hit. Damaging attacks are listed first, strongest at the top, followed by status moves. Moves that can't do anything in this battle system are left out (see below).
+  - **Attack:** pick one of its level-up attacks (learned by Lv 50), then choose which wild Pokémon to hit. Damaging attacks are listed first, strongest at the top, followed by status moves. Attacks that cost more charges than the Pokémon has are grayed out. Moves that can't do anything in this battle system are left out (see below).
   - **Items:** use an item on yourself or a teammate.
   - **Defend:** guard the next 2 hits.
   - **Evolve:** only appears when the Pokémon's evolution gauge is full (see below).
@@ -63,9 +65,9 @@ Your team is on the left and the wild Pokémon are on the right, with each Poké
   - **Advanced** (default): the bottom panel is gone and the battlefield fills the screen. Each Pokémon has a small floating nameplate (name, HP, status, ATB), and the command menu pops up right next to the Pokémon you're commanding, so your eyes stay on the action.
   - **Traditional:** classic layout with your team, commands and the wild Pokémon in a panel along the bottom.
 - **Evolution:** Pokémon that can still evolve, on either side, get a thin rainbow **evolution gauge** under their HP bar.
-  - The gauge fills over about 37 seconds of battle (a little slower for foes), and faster whenever the Pokémon lands or takes a hit.
-  - When it's full, the gauge shimmers and the Pokémon glows. Your Pokémon get a **✦ Evolve** command, and foes evolve on their next turn.
-  - Evolving uses that Pokémon's turn and freezes the whole battle for a short cutscene with its own music. The field dims, the Pokémon turns to light and flickers faster and faster between its old and new shapes, then bursts into its new form.
+  - The gauge fills over about 30 seconds of battle (a little slower for foes), and faster whenever the Pokémon lands or takes a hit.
+  - When it's full, the gauge shimmers and the Pokémon glows. Your Pokémon get a **✦ Evolve** command, and foes evolve as soon as they have a charge.
+  - Evolving costs one charge and freezes the whole battle for a short cutscene with its own music. The field dims, the Pokémon turns to light and flickers faster and faster between its old and new shapes, then bursts into its new form.
   - The new form gets its new name, types and stats. It keeps its moves, PP, status and stat changes.
   - It also **regains half of the health it had lost**, as a share of max HP. For example, at 40% HP it evolves to 70%.
   - A middle stage (Machoke, Ivysaur…) gets a fresh gauge for its next evolution. Branching lines like Eevee's evolve into one of their evolutions at random.
@@ -145,31 +147,31 @@ A roguelike mode: keep winning with a team that changes as you go. Losing a batt
 
 - **Stats:** level 50, perfect IVs, no EVs, neutral nature.
 - **Damage:** the main-series formula, including the full type chart (immunities too), STAB ×1.5, critical hits (1 in 24, ×1.5), a random 85–100% roll and accuracy checks. Physical attacks use Attack/Defense and special attacks use Sp. Atk/Sp. Def. Attacks with no listed power (Seismic Toss, Low Kick…) count as 60 power.
-- **ATB speed:** a full fill takes `300 ÷ base Speed` seconds, clamped to 2–7 s. Wild Pokémon fill 30% slower.
-- **Recovery:** after acting, the gauge refills from empty, slower for heavier actions:
+- **ATB speed:** each charge takes `0.6 × (300 ÷ base Speed)` seconds, with `300 ÷ base Speed` clamped to 2–7 s. Wild Pokémon fill 30% slower.
+- **ATB cost:** spending charges keeps any part-filled charge, so the gauge carries on from where it was.
 
-  | Action | Refill time |
+  | Action | Charges |
   | --- | --- |
-  | Attack | `0.6 + power ÷ 150`, clamped to ×0.8–×1.8 (40 power ≈ ×0.87, 90 ≈ ×1.2, 150 ≈ ×1.6) |
-  | Status attack | ×0.8 |
-  | Item | ×1.0 |
-  | Defend | ×0.7 |
-  | Evolve | ×0.8 |
+  | Attack under 55 power (Tackle, Ember, Vine Whip…) | 1 |
+  | Attack with 55–85 power (Bite, Headbutt, Slash…), or no listed power | 2 |
+  | Attack with 90 power or more (Flamethrower, Surf, Hyper Beam…) | 3 |
+  | Status attack | 1 |
+  | Item, Defend, Evolve | 1 |
 
 - **Defend:** gives 2 guard charges. Each attack that lands uses one charge and has its damage cut by a random 25–50%. Misses don't use a charge. Charges last until used, and defending again resets them to 2.
 - **PP:** each attack has limited uses. It's grayed out at 0.
-- **Status conditions** (one at a time), adapted to real time. "Turn" means each time the Pokémon's gauge fills:
+- **Status conditions** (one at a time), adapted to real time. "Charge" means each time one of the Pokémon's three charges fills:
 
   | Status | Effect |
   | --- | --- |
-  | 🔥 Burn | Loses 1/16 max HP each turn, and its physical attacks do half damage. Fire types are immune. |
-  | ☠️ Poison | Loses 1/8 max HP each turn. Poison and Steel types are immune. |
-  | ⚡ Paralysis | Gauge fills at half speed, and 25% of turns are lost. Electric types are immune. |
-  | 💤 Sleep | Loses its next 1–3 turns, then wakes up. |
-  | ❄️ Freeze | Loses turns until it thaws (20% chance each turn). Ice types are immune. |
+  | 🔥 Burn | Loses 1/24 max HP each charge, and its physical attacks do half damage. Fire types are immune. |
+  | ☠️ Poison | Loses 1/12 max HP each charge. Poison and Steel types are immune. |
+  | ⚡ Paralysis | Gauge fills at half speed, and 25% of charges are lost. Electric types are immune. |
+  | 💤 Sleep | Loses its next 2–4 charges, then wakes up. |
+  | ❄️ Freeze | Loses charges until it thaws (12% chance each charge). Ice types are immune. |
   | 💫 Confusion | Stacks with the others. For 2–5 actions, each attack has a 1-in-3 chance of hitting itself instead. |
 
-  Sleep or freeze landing on a Pokémon that's waiting for orders takes that turn away. Full Heal cures everything.
+  Sleep or freeze also wipes out any charges the Pokémon had saved up. Full Heal cures everything.
 - **Stat stages:** Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy and Evasion go from −6 to +6, as in the main series. Speed stages change how fast the gauge fills. Your HUD rows show current stages (e.g. `Atk+2`), and hovering a row shows everything.
 - **Status moves** work when they inflict a status, change stats or heal (Thunder Wave, Hypnosis, Growl, Swords Dance, Recover…). Moves that hit all opponents, like Growl or Poison Gas, affect every wild Pokémon.
 - **Left-out moves:** moves that would do nothing here aren't in the attack lists, for you or for foes.
