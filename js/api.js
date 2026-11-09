@@ -176,6 +176,7 @@ const PokeAPI = (() => {
           flavor: cleanText(s.flavor_text_entries.find(e => e.language.name === 'en')?.flavor_text),
           cry: p.cries?.latest || p.cries?.legacy || null,
           moves: levelUpMoves(p.moves),
+          chain: s.evolution_chain?.url || null,
         }))
         .then(details => {
           rememberBst(id, details.stats);
@@ -190,5 +191,16 @@ const PokeAPI = (() => {
     return detailCache.get(id);
   }
 
-  return { TYPES, GENERATIONS, loadIndex, loadDetails, loadMove, loadBst, cachedBst, spriteSources, prettyName };
+  // Species IDs this Pokémon evolves into next: none for a final stage, several for branching lines like Eevee's.
+  async function loadNextStages(details) {
+    if (!details.chain) return [];
+    const { chain } = await getJSON(details.chain);
+    const find = node => (idFromUrl(node.species.url) === details.id ? node : node.evolves_to.map(find).find(Boolean));
+    const node = find(chain);
+    return (node?.evolves_to || []).map(n => idFromUrl(n.species.url)).filter(id => id <= MAX_ID);
+  }
+
+  return {
+    TYPES, GENERATIONS, loadIndex, loadDetails, loadMove, loadBst, cachedBst, loadNextStages, spriteSources, prettyName,
+  };
 })();

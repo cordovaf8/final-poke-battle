@@ -137,6 +137,39 @@ const Music = (() => {
       drums: { volume: 0.9, pattern: 'k - - - s - - - k - k - s - - - k - - - - - - - - - - - - - - -' },
     },
 
+    // Evolution: a rising, shimmering build that breaks into an E major fanfare (at ~3.6 s) as the new form appears.
+    evolve: {
+      bpm: 132,
+      loop: false,
+      parts: [
+        {
+          wave: 'square', volume: 0.07, pattern: [
+            'E5 . G5 . E5 . G5 . F#5 . A5 . F#5 . A5 .',
+            'G5 . B5 . G5 . B5 . A5 . C6 . A5 . C6 .',
+            'B5 . . . B5 . E6 . . . . . . . - -',
+          ].join(' '),
+        },
+        {
+          wave: 'square', volume: 0.03, pattern: [
+            'B4 . . . . . . . C5 . . . . . . .',
+            'D5 . . . . . . . D#5 . . . . . . .',
+            'G#5 . . . G#5 . B5 . . . . . . . - -',
+          ].join(' '),
+        },
+        {
+          wave: 'triangle', volume: 0.17, pattern: [
+            'E3 . . . . . . . E3 . . . . . . .',
+            'E3 . . . . . . . E3 . . . . . . .',
+            'E3 . . . B2 . E3 . . . . . . . - -',
+          ].join(' '),
+        },
+      ],
+      drums: {
+        volume: 0.7,
+        pattern: `${repeat('- - - - - - - -', 3)} h h h h h h h h k - - - k - s - - - - - - - - -`,
+      },
+    },
+
     defeat: {
       bpm: 84,
       loop: false,

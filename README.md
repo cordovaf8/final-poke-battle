@@ -19,7 +19,7 @@ No build step and nothing to install.
 
 An internet connection is needed, since Pokémon data, sprites and cries are loaded from PokéAPI. The Pokédex list and stat totals are cached in `localStorage` after the first visit.
 
-**Music:** the team select screen plays a menu theme, and battles have their own theme plus victory and defeat jingles. Browsers block audio until you interact with the page, so the music starts on your first click or key press. Use the ♪ button (team select) or **Music on/off** (battle) to toggle it. The setting is remembered.
+**Music:** the team select screen plays a menu theme, and battles have their own theme plus evolution, victory and defeat jingles. Browsers block audio until you interact with the page, so the music starts on your first click or key press. Use the ♪ button (team select) or **Music on/off** (battle) to toggle it. The setting is remembered.
 
 ## How to play
 
@@ -48,10 +48,19 @@ Your team is on the left and the wild Pokémon are on the right, with each Poké
   - **Attack:** pick one of its level-up attacks (learned by Lv 50), then choose which wild Pokémon to hit.
   - **Items:** use an item on yourself or a teammate.
   - **Defend:** guard the next 2 hits.
+  - **Evolve:** only appears when the Pokémon's evolution gauge is full (see below).
 - **ATB pauses while the Attack or Items list is open**, so you can choose without being rushed.
 - **Two views:** switch any time with the **View** button (top right), the **V** key or **Y** on a controller. Your choice is remembered.
   - **Advanced** (default): the bottom panel is gone and the battlefield fills the screen. Each Pokémon has a small floating nameplate (name, HP, status, ATB), and the command menu pops up right next to the Pokémon you're commanding, so your eyes stay on the action.
   - **Traditional:** classic layout with your team, commands and the wild Pokémon in a panel along the bottom.
+- **Evolution:** Pokémon that can still evolve, on either side, get a thin rainbow **evolution gauge** under their HP bar.
+  - The gauge fills over about 37 seconds of battle (a little slower for foes), and faster whenever the Pokémon lands or takes a hit.
+  - When it's full, the gauge shimmers and the Pokémon glows. Your Pokémon get a **✦ Evolve** command, and foes evolve on their next turn.
+  - Evolving uses that Pokémon's turn and freezes the whole battle for a short cutscene with its own music. The field dims, the Pokémon turns to light and flickers faster and faster between its old and new shapes, then bursts into its new form.
+  - The new form gets its new name, types and stats. It keeps its moves, PP, status and stat changes.
+  - It also **regains half of the health it had lost**, as a share of max HP. For example, at 40% HP it evolves to 70%.
+  - A middle stage (Machoke, Ivysaur…) gets a fresh gauge for its next evolution. Branching lines like Eevee's evolve into one of their evolutions at random.
+  - Evolutions last for that battle only. Your team is back to its chosen forms for the next one.
 - **Attack animations:** every attack is animated in its type's style.
   - **Contact attacks** (Tackle, Fire Punch…) lunge in and land with a type-coloured impact.
   - **Special and status attacks** charge up, then fly across the field: fireballs, streams of bubbles, lightning from the sky, falling rocks, whirling leaves, ice shards, psychic rings and more.
@@ -120,6 +129,7 @@ After confirming your team, choose **Wild battle** for a quick fight against thr
   | Status attack | ×0.8 |
   | Item | ×1.0 |
   | Defend | ×0.7 |
+  | Evolve | ×0.8 |
 
 - **Defend:** gives 2 guard charges. Each attack that lands uses one charge and has its damage cut by a random 25–50%. Misses don't use a charge. Charges last until used, and defending again resets them to 2.
 - **PP:** each attack has limited uses. It's grayed out at 0.

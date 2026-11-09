@@ -573,5 +573,38 @@ const Fx = (() => {
     }
   }
 
-  return { init, deliver, ranged, windup, impact, affect, aura, stat, heal, ailment };
+  // Evolution, part one: motes of light stream into the Pokémon and rings tighten around it.
+  function evolveGather(el, duration) {
+    const p = box(el);
+    const colors = ['#ffffff', '#fff6c8', '#bdf2ff'];
+    const motes = 40;
+    for (let i = 0; i < motes; i += 1) {
+      const a = rand(0, Math.PI * 2);
+      const d = rand(90, 190);
+      const mote = spawn('dot', p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, rand(5, 11), pick(colors), undefined, { opacity: 0 });
+      gsap.timeline({ delay: (i / motes) * duration, onComplete: () => mote.remove() })
+        .to(mote, { opacity: 1, duration: 0.1 })
+        .to(mote, { x: -Math.cos(a) * d, y: -Math.sin(a) * d, scale: 0.4, duration: 0.55, ease: 'power2.in' }, 0);
+    }
+    for (let i = 0; i < 4; i += 1) {
+      const r = spawn('ring', p.x, p.y, p.w * 1.6, '#e9fbff');
+      gsap.timeline({ delay: (i * duration) / 4, onComplete: () => r.remove() })
+        .fromTo(r, { scale: 1.3, opacity: 0 }, { scale: 0.3, opacity: 0.9, duration: 0.6, ease: 'power2.in' })
+        .to(r, { opacity: 0, duration: 0.1 });
+    }
+  }
+
+  // Evolution, part two: the new form bursts out in a shower of light.
+  function evolveBurst(el) {
+    const p = box(el);
+    glowAt(p, '#ffffff', p.w * 2.2, 0.9);
+    ring(p, '#fff6c8', p.w * 2.4, { dur: 0.7 });
+    ring(p, '#bdf2ff', p.w * 1.8, { dur: 0.7, delay: 0.12 });
+    burst(p, 'sparkle', ['#ffffff', '#fff6c8', '#ffe066', '#bdf2ff'], {
+      count: 28, size: [10, 22], dist: [60, 170], dur: [0.8, 1.3], spin: 180, end: 0,
+    });
+    burst(p, 'dot', ['#ffffff', '#bdf2ff'], { count: 16, dist: [30, 120], gravity: 40, dur: [0.9, 1.4], delay: [0.1, 0.4] });
+  }
+
+  return { init, deliver, ranged, windup, impact, affect, aura, stat, heal, ailment, evolveGather, evolveBurst };
 })();

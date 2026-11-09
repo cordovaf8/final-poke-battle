@@ -65,7 +65,7 @@
     moveList: $('#moveList'), itemMenu: $('#itemMenu'), itemList: $('#itemList'), flash: $('#flash'),
     result: $('#result'), resultTitle: $('#resultTitle'), resultText: $('#resultText'), againBtn: $('#againBtn'),
     music: $('#musicBtn'), viewBtn: $('#viewBtn'), plates: $('#plates'), enemyWindow: $('.enemy-window'),
-    floorTitle: $('#floorTitle'), backBtn: $('.back-btn'), enemyTitle: $('.enemy-window .hud-head span'),
+    floorTitle: $('#floorTitle'), evolveCmd: $('#evolveCmd'), backBtn: $('.back-btn'), enemyTitle: $('.enemy-window .hud-head span'),
   };
   const VIEW_KEY = 'battleView';
   // How far the commanded Pokémon steps toward the enemy (px).
@@ -77,6 +77,8 @@
     ready: [], active: null, targeting: null, over: false,
     // paused: ATB gauges freeze while an Attack/Items menu is open; pending holds enemy turns that came due meanwhile.
     paused: false, pending: [],
+    // started: gauges are running. evolving: the fighter mid-evolution, while the rest of the battle is frozen.
+    started: false, evolving: null, evoQueue: [],
     items: ITEMS.map(item => ({ ...item })),
   };
 
@@ -90,7 +92,10 @@
   const atbDuration = (f, scale = 1) => (gsap.utils.clamp(2, 7, 300 / (f.base.speed || 50)) * scale) / Combat.speedFactor(f);
   // Heavier attacks take longer to recover from: the gauge refills slower afterwards
   // (40 power ≈ ×0.87, 90 ≈ ×1.2, 150 ≈ ×1.6).
-  const RECOVERY = { defend: 0.7, item: 1, status: 0.8 };
+  const RECOVERY = { defend: 0.7, item: 1, status: 0.8, evolve: 0.8 };
+  // Evolution gauge: fills over about this many seconds of battle, faster when landing or taking hits.
+  const EVO_SECONDS = 37.5;
+  const ENEMY_EVO_SCALE = 1.25;
   const recoveryFactor = move => (move.category === 'status'
     ? RECOVERY.status
     : gsap.utils.clamp(0.8, 1.8, 0.6 + (move.power ?? 60) / 150));
@@ -359,6 +364,7 @@
             <span class="row-stages"></span>
           </span>
           <span class="bar hp"><i></i></span>
+          <span class="bar evo" hidden><i></i></span>
         </span>
         <span class="bar atb"><i></i></span>
       </${party ? 'button' : 'div'}>`;
@@ -469,12 +475,13 @@
   }
 
   let messageTimeline = null;
-  function showMessage(text) {
+  // hold: seconds the message stays up, or Infinity to keep it until the next one.
+  function showMessage(text, hold = 1.6) {
     messageTimeline?.kill();
     els.message.textContent = text;
     messageTimeline = gsap.timeline()
-      .fromTo(els.message, { scaleY: 0, opacity: 1 }, { scaleY: 1, duration: 0.18, ease: 'power2.out' })
-      .to(els.message, { scaleY: 0, duration: 0.18, ease: 'power2.in', delay: 1.6 });
+      .fromTo(els.message, { scaleY: 0, opacity: 1 }, { scaleY: 1, duration: 0.18, ease: 'power2.out' });
+    if (hold !== Infinity) messageTimeline.to(els.message, { scaleY: 0, duration: 0.18, ease: 'power2.in', delay: hold });
   }
 
   // ---------- Real-time ATB ----------
@@ -498,7 +505,15 @@
     if (battle.paused === paused) return;
     battle.paused = paused;
     document.body.classList.toggle('atb-paused', paused);
-    [...battle.party, ...battle.enemies].forEach(f => (paused ? f.atbTween?.pause() : f.atbTween?.resume()));
+    [...battle.party, ...battle.enemies].forEach(f => {
+      if (paused) {
+        f.atbTween?.pause();
+        f.evo?.tween?.pause();
+      } else {
+        f.atbTween?.resume();
+        if (!f.fainted) f.evo?.tween?.resume();
+      }
+    });
     if (!paused) battle.pending.splice(0).forEach(enemyAct);
   }
 
@@ -592,6 +607,7 @@
     gsap.fromTo(unit.querySelector('.unit-cursor'), { y: 0 }, { y: -6, duration: 0.3, ease: 'steps(1)', repeat: -1, yoyo: true });
     els.commandTitle.textContent = f.name;
     renderMoves(i);
+    refreshEvolveCommand();
     closeMenus();
     openCommand();
   }
@@ -852,6 +868,8 @@
     shake(target);
     popup(target, damage, result.crit ? 'damage crit' : 'damage', notes.join(' · '));
     setHp(target, target.hp - damage);
+    chargeEvo(attacker, 0.048);
+    chargeEvo(target, (damage / target.maxHp) * 0.36);
     applySecondary(attacker, target, move, damage);
   }
 
@@ -876,6 +894,10 @@
       return;
     }
     if (!startTurn(f)) return;
+    if (f.evo?.ready) {
+      evolve(f, () => fillEnemyAtb(j, 0, RECOVERY.evolve));
+      return;
+    }
     const move = chooseEnemyMove(f);
     const scope = moveScope(move);
     const target = scope === 'self' ? f : pick(living(battle.party));
@@ -907,6 +929,7 @@
 
   function faint(f) {
     f.fainted = true;
+    f.evo?.tween?.pause();
     Combat.clearConditions(f);
     showGuard(f);
     paintConditions(f);
@@ -947,6 +970,202 @@
     Fx.heal(imgOf(f));
     setHp(f, Math.floor(f.maxHp / 2));
     fillPartyAtb(f.index);
+    if (battle.started) fillEvo(f, evoProgress(f));
+  }
+
+  // ---------- Evolution ----------
+  // Pokémon with a next stage get an evolution gauge. When it fills, yours can choose Evolve;
+  // foes evolve on their next turn. Evolving freezes the battle for a short cutscene.
+
+  // Looks up the next stage in the background and preloads its sprite, then shows the gauge.
+  // Branching lines (Eevee, Poliwhirl…) pick one of their evolutions at random.
+  async function prepareEvolution(f) {
+    try {
+      const stages = await PokeAPI.loadNextStages(await PokeAPI.loadDetails(f.id));
+      if (!stages.length) return;
+      const to = await PokeAPI.loadDetails(pick(stages));
+      const img = document.createElement('img');
+      img.className = 'unit-sprite evo-next';
+      img.alt = to.name;
+      imgOf(f).after(img);
+      await loadSprite(img, to.id);
+      if (!img.naturalWidth || battle.over) {
+        img.remove();
+        return;
+      }
+      f.evo = { to, img, ready: false, tween: null };
+      const bar = rowOf(f).querySelector('.bar.evo');
+      bar.hidden = false;
+      bar.title = `Evolution gauge: evolves into ${to.name}`;
+      positionPlates();
+      if (battle.started) fillEvo(f);
+    } catch {
+      // No evolution this battle if PokéAPI can't be reached.
+    }
+  }
+
+  const evoFill = f => rowOf(f).querySelector('.bar.evo i');
+  const evoProgress = f => gsap.getProperty(evoFill(f), 'scaleX');
+
+  function fillEvo(f, from = 0) {
+    const evo = f.evo;
+    if (!evo || evo.ready || f.fainted || battle.over) return;
+    const seconds = EVO_SECONDS * (f.side === 'enemy' ? ENEMY_EVO_SCALE : 1);
+    evo.tween?.kill();
+    evo.tween = gsap.fromTo(evoFill(f), { scaleX: from }, {
+      scaleX: 1, duration: seconds * (1 - from), ease: 'none', paused: battle.paused, onComplete: () => evoReady(f),
+    });
+  }
+
+  // Landing and taking hits charge the gauge faster.
+  function chargeEvo(f, amount) {
+    if (!f.evo || f.evo.ready || f.fainted || !battle.started) return;
+    const progress = evoProgress(f) + amount;
+    if (progress < 1) {
+      fillEvo(f, progress);
+      return;
+    }
+    f.evo.tween?.kill();
+    gsap.set(evoFill(f), { scaleX: 1 });
+    evoReady(f);
+  }
+
+  function evoReady(f) {
+    if (f.fainted || battle.over) return;
+    f.evo.ready = true;
+    rowOf(f).classList.add('can-evolve');
+    rowOf(f).querySelector('.bar.evo').classList.add('full');
+    unitOf(f).classList.add('can-evolve');
+    showMessage(`${displayName(f)} is ready to evolve!`);
+    if (f.side === 'party' && battle.active === f.index) refreshEvolveCommand();
+  }
+
+  function refreshEvolveCommand() {
+    const can = Boolean(battle.party[battle.active]?.evo?.ready);
+    els.evolveCmd.hidden = !can;
+    els.commandPanel.classList.toggle('can-evolve', can);
+    positionPanel();
+  }
+
+  function chooseEvolve() {
+    const f = battle.party[battle.active];
+    if (!f?.evo?.ready) return;
+    endTurn(`What? ${f.name} is evolving!`, RECOVERY.evolve);
+    evolve(f);
+  }
+
+  // Swaps in the new form's species, types and stats. Moves and their PP carry over, as do
+  // status conditions and stat stages. It regains half of the health it had lost, as a share of
+  // max HP: at 40% HP it evolves to 70%.
+  function applyEvolution(f, to) {
+    const before = f.hp;
+    const ratio = f.hp / f.maxHp;
+    const fresh = Combat.createFighter(to, f.side, f.index);
+    Object.assign(f, {
+      id: to.id, name: to.name, types: to.types, base: to.stats, stats: fresh.stats, learnset: to.moves, maxHp: fresh.maxHp,
+    });
+    f.hp = Math.min(f.maxHp, Math.round(f.maxHp * (ratio + (1 - ratio) / 2)));
+
+    const row = rowOf(f);
+    row.querySelector('.row-name').firstChild.textContent = f.name;
+    row.querySelector('.row-types').innerHTML = f.types.map(typeBadge).join('');
+    row.querySelector('.num').innerHTML = `<b>${before}</b>/${f.maxHp}`;
+    unitOf(f).querySelector('.unit-types').innerHTML = f.types.map(typeBadge).join('');
+    if (f.side === 'party' && battle.active === f.index) els.commandTitle.textContent = f.name;
+    updateHp(f);
+    paintConditions(f);
+    popup(f, `+${Math.max(0, f.hp - before)}`, 'heal', 'Evolved!');
+  }
+
+  // The cutscene: everything else freezes, the Pokémon turns to light and flickers between its
+  // old and new shapes, faster and faster, then bursts into its new form.
+  function evolve(f, done) {
+    if (battle.evolving) {
+      battle.evoQueue.push([f, done]);
+      return;
+    }
+    const { to, img: next } = f.evo;
+    const unit = unitOf(f);
+    const old = imgOf(f);
+    const from = displayName(f);
+    // Every running animation, gauge and timer (delayed calls included) is parked in one timeline and paused.
+    const world = gsap.exportRoot({}, true);
+    world.pause();
+    battle.evolving = f;
+    f.evo.tween?.kill();
+    gsap.set(rowOf(f).querySelector('.atb i'), { scaleX: 0 });
+    rowOf(f).querySelector('.atb').classList.remove('full');
+    document.body.classList.add('evolving');
+    unit.classList.add('evolving');
+    unit.classList.remove('can-evolve');
+    Music.play('evolve');
+    showMessage(`What? ${from} is evolving!`, Infinity);
+
+    let dim = els.field.querySelector('.evo-dim');
+    if (!dim) {
+      dim = document.createElement('div');
+      dim.className = 'evo-dim';
+      els.field.appendChild(dim);
+    }
+    const sprite = old.getBoundingClientRect();
+    const field = els.field.getBoundingClientRect();
+    dim.style.setProperty('--x', `${sprite.left + sprite.width / 2 - field.left}px`);
+    dim.style.setProperty('--y', `${sprite.top + sprite.height / 2 - field.top}px`);
+
+    const white = 'brightness(0) invert(1) drop-shadow(0 0 12px #ffffff)';
+    const plain = 'brightness(1) invert(0) drop-shadow(0 0 0px #ffffff)';
+    const inner = innerOf(unit);
+    gsap.set(next, { visibility: 'visible', opacity: 0, filter: white });
+
+    const REVEAL = 3.65; // lines up with the fanfare in the evolution music
+    const tl = gsap.timeline()
+      .to(dim, { opacity: 1, duration: 0.5 }, 0)
+      .add(() => Fx.evolveGather(old, REVEAL - 0.6), 0.2)
+      .fromTo(old, { filter: plain }, { filter: white, duration: 0.6, ease: 'power1.in' }, 0.3)
+      .to(inner, { y: -10, duration: 0.6, ease: 'sine.inOut', yoyo: true, repeat: 4 }, 0.3);
+    // Flicker between the two silhouettes, a little faster each time.
+    let showNew = true;
+    for (let t = 1, gap = 0.42; t < REVEAL - 0.1; t += gap, gap = Math.max(0.05, gap * 0.8), showNew = !showNew) {
+      tl.set(old, { opacity: showNew ? 0 : 1 }, t).set(next, { opacity: showNew ? 1 : 0 }, t);
+    }
+    tl.to(els.flash, { opacity: 0.95, duration: 0.08 }, REVEAL - 0.08)
+      .add(() => {
+        old.remove();
+        next.classList.remove('evo-next');
+        gsap.set(next, { opacity: 1, clearProps: 'visibility' });
+        gsap.set(inner, { y: 0 });
+        applyEvolution(f, to);
+        relayout();
+        Fx.evolveBurst(next);
+        showMessage(`${from} evolved into ${to.name}!`, 2.4);
+      }, REVEAL)
+      .to(els.flash, { opacity: 0, duration: 0.7 }, REVEAL)
+      .to(next, { filter: plain, duration: 0.8, clearProps: 'filter' }, REVEAL + 0.1)
+      .fromTo(inner, { scale: 1.15 }, { scale: 1, duration: 0.6, ease: 'elastic.out(1, 0.45)' }, REVEAL + 0.1)
+      .to(dim, { opacity: 0, duration: 0.6 }, REVEAL + 0.9)
+      .add(() => {
+        unit.classList.remove('evolving');
+        document.body.classList.remove('evolving');
+        const row = rowOf(f);
+        row.classList.remove('can-evolve');
+        row.querySelector('.bar.evo').classList.remove('full');
+        row.querySelector('.bar.evo').hidden = true;
+        gsap.set(evoFill(f), { scaleX: 0 });
+        f.evo = null;
+        battle.evolving = null;
+        // A middle stage gets a fresh gauge for its next evolution.
+        prepareEvolution(f);
+        const queued = battle.evoQueue.shift();
+        if (queued) {
+          world.resume();
+          done?.();
+          evolve(...queued);
+          return;
+        }
+        Music.play('battle');
+        world.resume();
+        done?.();
+      }, REVEAL + 1.6);
   }
 
   // ---------- Commands ----------
@@ -1106,7 +1325,7 @@
   }
 
   function focusItem(menu, index = 0) {
-    const items = menu.querySelectorAll('.menu-item');
+    const items = menu.querySelectorAll('.menu-item:not([hidden])');
     select(items[Math.min(index, items.length - 1)]);
   }
 
@@ -1229,7 +1448,7 @@
     const cols = getComputedStyle(list).gridTemplateColumns.split(' ').length;
     const step = { ArrowUp: -cols, ArrowDown: cols, ArrowLeft: cols > 1 ? -1 : 0, ArrowRight: cols > 1 ? 1 : 0 }[key];
     if (step == null) return false;
-    const items = [...list.querySelectorAll('.menu-item')];
+    const items = [...list.querySelectorAll('.menu-item:not([hidden])')];
     select(items[items.indexOf(item) + step]);
     return true;
   }
@@ -1256,6 +1475,7 @@
       els.music.click();
       return;
     }
+    if (battle.evolving) return;
     if (action === 'y') {
       toggleView();
       return;
@@ -1285,7 +1505,7 @@
     // Sprites and HUD rows: pick a target while targeting, otherwise take command of a party member.
     const onFighterClick = e => {
       const f = fighterOf(e.target);
-      if (!f || battle.over) return;
+      if (!f || battle.over || battle.evolving) return;
       if (battle.targeting) confirmTarget(f);
       else if (f.side === 'party') commandUnit(f);
     };
@@ -1315,13 +1535,14 @@
         return;
       }
       const item = e.target.closest('.menu-item');
-      if (!item || battle.active == null) return;
+      if (!item || battle.active == null || battle.evolving) return;
       cancelTargeting();
       select(item);
       switch (item.dataset.action) {
         case 'attack': openSubmenu(els.attackMenu); break;
         case 'items': openSubmenu(els.itemMenu); break;
         case 'defend': defend(); break;
+        case 'evolve': chooseEvolve(); break;
         case 'move': chooseMove(Number(item.dataset.index)); break;
         case 'item': chooseItem(Number(item.dataset.index)); break;
       }
@@ -1331,6 +1552,7 @@
     });
 
     document.addEventListener('keydown', e => {
+      if (battle.evolving) return;
       if (battle.targeting) {
         const step = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }[e.key];
         if (step) cycleTarget(step);
@@ -1372,7 +1594,7 @@
   }
 
   function toggleView() {
-    if (battle.party.length) setView(isAdvanced() ? 'traditional' : 'advanced');
+    if (battle.party.length && !battle.evolving) setView(isAdvanced() ? 'traditional' : 'advanced');
   }
 
   function updateMusicButton() {
@@ -1460,6 +1682,8 @@
       .add(() => {
         battle.party.forEach((_, i) => fillPartyAtb(i, rand(0, 0.35)));
         battle.enemies.forEach((_, j) => fillEnemyAtb(j, rand(0, 0.2)));
+        battle.started = true;
+        [...battle.party, ...battle.enemies].forEach(f => fillEvo(f));
       }, floorInfo ? 2.6 : 1.8);
 
     // Tower floors open with a big title card.
@@ -1522,6 +1746,8 @@
       ...battle.enemies.map(f => loadSprite(imgOf(f), f.id)),
     ]);
     els.loading.remove();
+    // Next stages load in the background; their gauges appear once ready.
+    [...battle.party, ...battle.enemies].forEach(prepareEvolution);
     // Advanced is the default; Traditional only if the player picked it before.
     let view = 'advanced';
     try { view = localStorage.getItem(VIEW_KEY) === 'traditional' ? 'traditional' : 'advanced'; } catch { /* default */ }

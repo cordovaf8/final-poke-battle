@@ -250,6 +250,26 @@ img { image-rendering: pixelated; }
 }
 .unit-types .type { font-size: 10px; padding: 2px 7px; }
 .unit.fainted .unit-types { opacity: 0.35; }
+
+/* Evolution: the next form's sprite waits hidden behind the current one. */
+.unit-sprite.evo-next { position: absolute; bottom: 0; left: 50%; translate: -50% 0; visibility: hidden; }
+.unit.can-evolve:not(.fainted) .unit-shadow {
+  background: radial-gradient(closest-side, rgba(190, 245, 255, 0.95), rgba(120, 200, 255, 0.4) 60%, transparent);
+  animation: evo-glow 1.2s ease-in-out infinite;
+}
+@keyframes evo-glow { 50% { opacity: 0.45; scale: 1.15 1; } }
+/* During the cutscene the field dims around the evolving Pokémon, which is lifted above it. */
+.evo-dim {
+  position: absolute;
+  inset: 0;
+  z-index: 105;
+  background: radial-gradient(circle at var(--x) var(--y), rgba(30, 40, 90, 0.55), rgba(4, 6, 20, 0.92) 55%);
+  opacity: 0;
+  pointer-events: none;
+}
+.unit.evolving { z-index: 108 !important; }
+body.evolving :is(.plates, .command-panel),
+body.evolving :is(.plates, .command-panel) * { visibility: hidden !important; }
 .view-advanced .unit-types { display: none; }
 
 /* In Advanced view the types sit inside the nameplate instead; the bottom panel rows don't show them. */
@@ -532,6 +552,7 @@ body.targeting .unit, body.targeting .enemy-row { cursor: pointer; }
   transition: left 0.18s ease-out, top 0.18s ease-out;
 }
 .view-advanced .command-panel:not(.engaged) { display: none; }
+.view-advanced .command-panel.can-evolve { height: 182px; }
 .view-advanced .command-panel.expanded { width: min(340px, calc(100% - 16px)); height: min(290px, calc(100% - 70px)); }
 .view-advanced .command-hint { display: none; }
 
@@ -677,6 +698,13 @@ body.targeting .unit, body.targeting .enemy-row { cursor: pointer; }
 .bar.atb.full i { animation: atb-ready 0.6s steps(2) infinite; }
 @keyframes atb-ready { 50% { background: #fff6c8; } }
 .enemy-row .bar.hp i { background: linear-gradient(90deg, #d8434f, #ff8a6b); }
+/* Evolution gauge: only shown for Pokémon with a next stage. */
+.bar.evo { height: 4px; }
+.bar.evo[hidden] { display: none; }
+.bar.evo i { background: linear-gradient(90deg, #4fd8ff, #b88bff, #ffd6f5); transform: scaleX(0); }
+.bar.evo.full i { animation: evo-ready 1s ease-in-out infinite; }
+@keyframes evo-ready { 50% { background: #ffffff; box-shadow: 0 0 6px #bdf2ff; } }
+.plate .bar.evo { height: 4px; }
 .enemy-row .bar.atb i { background: linear-gradient(90deg, #8e3a9e, #e27ad8); }
 
 /* ---------- Command panel ---------- */
@@ -755,6 +783,10 @@ body.targeting .unit, body.targeting .enemy-row { cursor: pointer; }
 .menu-item:focus { outline: none; }
 .menu-item.current { color: #fff; background: rgba(255, 255, 255, 0.1); }
 .menu-item.disabled { color: #7d86b8; cursor: not-allowed; }
+.menu-item[hidden] { display: none; }
+.menu-item.evolve-cmd { color: #9ff0ff; animation: evo-cmd 1.2s ease-in-out infinite; }
+.menu-item.evolve-cmd::before { content: '✦ '; color: #ffe066; }
+@keyframes evo-cmd { 50% { color: #ffffff; text-shadow: 0 0 8px #7fe6ff; } }
 .menu-item.disabled.current { color: #9aa2cc; }
 body.targeting .pane.open { opacity: 0.55; }
 .menu-item.move, .menu-item.bag-item {
