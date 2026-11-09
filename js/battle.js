@@ -23,9 +23,9 @@
     { id: 'ether', name: 'Ether', qty: 2, target: 'self', text: "Restores 10 PP to each of the user's attacks." },
     { id: 'x-attack', name: 'X Attack', qty: 2, target: 'self', text: "Sharply raises the user's Attack for the rest of the battle." },
   ];
-  // Used by wild Pokémon that know no damaging attacks.
+  // Given to any Pokémon that knows no usable damaging attack.
   const TACKLE = {
-    name: 'Tackle', type: 'normal', category: 'physical', power: 40, accuracy: 100, pp: 35, target: 'selected-pokemon',
+    id: 'tackle', name: 'Tackle', type: 'normal', category: 'physical', power: 40, accuracy: 100, pp: 35, target: 'selected-pokemon',
     ailment: 'none', ailmentChance: 0, statChanges: [], statChance: 0, effectCategory: 'damage', healing: 0, drain: 0,
     effect: '',
   };
@@ -55,6 +55,15 @@
   // Field effects, switching and the like aren't modeled, so those status moves do nothing yet.
   const statusMoveWorks = m => moveScope(m) !== 'none'
     && (m.statChanges.length > 0 || SUPPORTED_AILMENTS.has(m.ailment) || m.healing > 0);
+  // Attacks that rely on mechanics this battle doesn't have: returning damage taken (Counter, Bide…),
+  // acting while asleep (Snore), the first turn only (Fake Out), held items or berries (Fling, Belch)
+  // or Stockpile charges (Spit Up).
+  const UNSUPPORTED_ATTACKS = new Set([
+    'counter', 'mirror-coat', 'metal-burst', 'bide', 'comeuppance', 'snore', 'fake-out', 'first-impression',
+    'fling', 'natural-gift', 'belch', 'spit-up',
+  ]);
+  // Only moves that do something in this battle make the attack list.
+  const moveWorks = m => (m.category === 'status' ? statusMoveWorks(m) : !UNSUPPORTED_ATTACKS.has(m.id));
 
   const $ = sel => document.querySelector(sel);
   const els = {
@@ -167,9 +176,15 @@
     f.movesReady ||= Promise.allSettled(
       f.learnset.filter(m => m.level <= Combat.LEVEL).map(m => PokeAPI.loadMove(m.name)),
     ).then(results => {
-      f.moves = results
-        .filter(r => r.status === 'fulfilled')
+      const moves = results
+        .filter(r => r.status === 'fulfilled' && moveWorks(r.value))
         .map(r => ({ ...r.value, pp: r.value.pp ?? 10, ppLeft: r.value.pp ?? 10 }));
+      // A Pokémon left without a damaging attack (Ditto, Wobbuffet) gets Tackle so it can still fight.
+      if (!moves.some(m => m.category !== 'status')) moves.push({ ...TACKLE, ppLeft: TACKLE.pp });
+      // Damaging attacks first, strongest at the top (no listed power counts as 60, as in the damage
+      // formula), then status moves in the order they're learned.
+      const damaging = moves.filter(m => m.category !== 'status').sort((a, b) => (b.power ?? 60) - (a.power ?? 60));
+      f.moves = [...damaging, ...moves.filter(m => m.category === 'status')];
       return f.moves;
     });
     return f.movesReady;
@@ -424,11 +439,12 @@
 
   function positionPlates() {
     if (!isAdvanced()) return;
-    const field = els.field.getBoundingClientRect();
     const plates = [...battle.party, ...battle.enemies].map(f => {
-      const img = imgOf(f).getBoundingClientRect();
-      const box = img.width ? img : unitOf(f).getBoundingClientRect();
-      return { el: f.plate, x: box.left + box.width / 2 - field.left, y: box.top - field.top, w: f.plate.offsetWidth, h: f.plate.offsetHeight };
+      // Layout offsets rather than on-screen boxes, so plates placed mid-animation still land right:
+      // they ignore the intro zoom and slide-in, screen shake, and the sprite's lunges and hops.
+      // A unit is drawn centred on its left edge with its feet on its top edge (translate -50% -100%).
+      const unit = unitOf(f);
+      return { el: f.plate, x: unit.offsetLeft, y: unit.offsetTop - unit.offsetHeight, w: f.plate.offsetWidth, h: f.plate.offsetHeight };
     });
     // Neighbouring Pokémon can stack their plates; place front-row plates first and lift any back-row plate that collides.
     plates.sort((a, b) => b.y - a.y);
@@ -1402,17 +1418,12 @@
     els.moveList.innerHTML = '<p class="menu-empty">Loading attacks…</p>';
     const moves = await loadMoves(battle.party[i]);
     if (battle.active !== i) return;
-    if (!moves.length) {
-      els.moveList.innerHTML = '<p class="menu-empty">No attacks known.</p>';
-      return;
-    }
     els.moveList.innerHTML = moves.map((m, index) => {
       const factor = recoveryFactor(m);
       const meta = [
         capitalize(m.type), capitalize(m.category), `Power ${m.power ?? '—'}`,
         `Acc ${m.accuracy ? `${m.accuracy}%` : '—'}`, `ATB refill ×${factor.toFixed(2)}`,
-        m.category === 'status' && !statusMoveWorks(m) ? 'No effect in battle yet' : '',
-      ].filter(Boolean).join(' · ');
+      ].join(' · ');
       return `
         <button type="button" class="menu-item move${m.ppLeft <= 0 ? ' disabled' : ''}" role="menuitem"
           data-action="move" data-index="${index}" data-meta="${attr(`${m.name} — ${meta}`)}" data-help="${attr(m.effect)}">

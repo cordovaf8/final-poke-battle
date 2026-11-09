@@ -135,6 +135,7 @@ const PokeAPI = (() => {
     if (!moveCache.has(name)) {
       const request = getJSON(`${BASE}/move/${name}`)
         .then(m => ({
+          id: m.name,
           name: m.names.find(n => n.language.name === 'en')?.name || prettyName(m.name),
           type: m.type.name,
           category: m.damage_class.name,

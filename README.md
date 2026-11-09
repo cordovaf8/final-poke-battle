@@ -45,7 +45,7 @@ Your team is on the left and the wild Pokémon are on the right, with each Poké
 
 - **Take command:** when a gauge is full, the Pokémon's name turns gold. Click its row or its sprite to command it. The first ready Pokémon is selected automatically, and you can switch between ready Pokémon without losing a turn.
 - **Commands:**
-  - **Attack:** pick one of its level-up attacks (learned by Lv 50), then choose which wild Pokémon to hit.
+  - **Attack:** pick one of its level-up attacks (learned by Lv 50), then choose which wild Pokémon to hit. Damaging attacks are listed first, strongest at the top, followed by status moves. Moves that can't do anything in this battle system are left out (see below).
   - **Items:** use an item on yourself or a teammate.
   - **Defend:** guard the next 2 hits.
   - **Evolve:** only appears when the Pokémon's evolution gauge is full (see below).
@@ -147,6 +147,10 @@ After confirming your team, choose **Wild battle** for a quick fight against thr
   Sleep or freeze landing on a Pokémon that's waiting for orders takes that turn away. Full Heal cures everything.
 - **Stat stages:** Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy and Evasion go from −6 to +6, as in the main series. Speed stages change how fast the gauge fills. Your HUD rows show current stages (e.g. `Atk+2`), and hovering a row shows everything.
 - **Status moves** work when they inflict a status, change stats or heal (Thunder Wave, Hypnosis, Growl, Swords Dance, Recover…). Moves that hit all opponents, like Growl or Poison Gas, affect every wild Pokémon.
+- **Left-out moves:** moves that would do nothing here aren't in the attack lists, for you or for foes.
+  - Status moves with field, switching or other special effects (Rain Dance, Protect, Leech Seed, Whirlwind, Splash, Transform…).
+  - Attacks that need missing mechanics: returning damage taken (Counter, Mirror Coat, Metal Burst, Bide, Comeuppance), acting while asleep (Snore), the first turn only (Fake Out, First Impression), held items or berries (Fling, Natural Gift, Belch) or Stockpile (Spit Up).
+  - A Pokémon left with no damaging attack (Ditto, Wobbuffet) gets Tackle.
 - **Attack side effects:** status chances (Ember's 10% burn), stat drops or boosts (Bubble Beam, Close Combat, Flame Charge), draining (Giga Drain) and recoil (Take Down).
 - **Wild Pokémon** use status moves too, about 30% of the time when they have useful ones.
 - **Items:**
@@ -162,7 +166,7 @@ After confirming your team, choose **Wild battle** for a quick fight against thr
 
 ### Not in yet
 
-- Status moves with field or special effects (Rain Dance, Spikes, Protect, Leech Seed, Toxic's worsening poison…) use the turn but do nothing. Their info says "No effect in battle yet".
+- Status moves with field or special effects (Rain Dance, Spikes, Protect, Leech Seed…), so they're left out of attack lists. Toxic works as regular poison, without the worsening damage.
 - Attacks that hit several Pokémon only hit the one you pick, and multi-hit attacks and flinching aren't modeled.
 - No abilities or held items in battle.
 - No switching Pokémon in or out.
