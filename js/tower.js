@@ -195,7 +195,7 @@
   function enterFloor() {
     if (busy) return;
     if (!team.length) {
-      location.href = 'index.html';
+      location.href = 'team.html?mode=tower';
       return;
     }
     if (run.floor >= TOP) {

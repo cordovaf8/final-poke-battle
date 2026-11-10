@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Adventure</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/adventure.css">
+</head>
+<body class="adventure-page">
+  <div class="av-sky" aria-hidden="true"></div>
+
+  <header class="av-top">
+    <a class="btn" href="index.html">&larr; Menu</a>
+    <h1>Adventure</h1>
+    <button type="button" class="btn" id="musicBtn" aria-pressed="true">&#9835; Music on</button>
+  </header>
+
+  <main class="av-main">
+    <aside class="av-side" id="side">
+      <section class="av-box">
+        <h2>Your team</h2>
+        <div class="av-team" id="team"></div>
+      </section>
+      <section class="av-box">
+        <h2>Bag</h2>
+        <div class="av-bag" id="bag"></div>
+      </section>
+      <section class="av-box av-legend" id="legend"></section>
+      <p class="av-progress" id="progress"></p>
+      <button type="button" class="btn av-quiet" id="quitBtn" hidden>Give up adventure</button>
+    </aside>
+
+    <section class="av-map-wrap" id="mapWrap" aria-label="Route map">
+      <p class="av-hint" id="hint"></p>
+      <div class="av-map" id="map">
+        <svg class="av-paths" id="paths" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="av-nodes" id="nodes"></div>
+        <img class="av-token" id="token" alt="">
+      </div>
+    </section>
+  </main>
+
+  <!-- One stop at a time: battles, events, rewards and the end of the run all open here. -->
+  <div class="av-dialog" id="dialog" hidden>
+    <div class="av-card" id="card" role="dialog" aria-modal="true" aria-labelledby="cardTitle">
+      <p class="av-kicker" id="cardKicker"></p>
+      <h2 id="cardTitle"></h2>
+      <div class="av-body" id="cardBody"></div>
+      <div class="av-choices" id="cardChoices"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+  <div class="av-flash" id="flash"></div>
+
+  <div class="pad-legend" aria-hidden="true">
+    <span><i class="pad-btn">D-pad</i> Move</span>
+    <span><i class="pad-btn a">A</i> Choose</span>
+    <span><i class="pad-btn b">B</i> Menu</span>
+    <span><i class="pad-btn">Select</i> Music</span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/music.js"></script>
+  <script src="js/gamepad.js"></script>
+  <script src="js/adventure-data.js"></script>
+  <script src="js/adventure.js"></script>
+</body>
+</html>

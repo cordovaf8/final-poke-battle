@@ -8,8 +8,10 @@
     hp: 'HP', attack: 'Atk', defense: 'Def',
     'special-attack': 'Sp. Atk', 'special-defense': 'Sp. Def', speed: 'Speed',
   };
-  // index.html?mode=rogue picks the starting team of a Rogue run: 1★ Pokémon only, kept apart from your usual team.
-  const ROGUE = new URLSearchParams(location.search).get('mode') === 'rogue';
+  // team.html?mode=… picks a team for the mode chosen on the menu, and confirming heads straight into it.
+  // mode=rogue picks the starting team of a Rogue run: 1★ Pokémon only, kept apart from your usual team.
+  const MODE = Modes.get(new URLSearchParams(location.search).get('mode'));
+  const ROGUE = MODE.id === 'rogue';
   const STORAGE = { team: 'pokemonTeam', draft: ROGUE ? 'rogueTeamDraft' : 'pokemonTeamDraft', muted: 'pokemonMuted' };
 
   const $ = sel => document.querySelector(sel);
@@ -22,8 +24,8 @@
     types: $('#detailTypes'), flavor: $('#detailFlavor'), height: $('#detailHeight'), weight: $('#detailWeight'),
     abilities: $('#detailAbilities'), stats: $('#detailStats'), add: $('#detailAdd'),
     cost: $('#detailCost'), stars: $('#detailStars'), note: $('#detailNote'), budgetText: $('#budgetText'), budgetBar: $('#budgetBar'),
-    toast: $('#toast'), overlay: $('#overlay'), podium: $('#podium'), editBtn: $('#editBtn'), battleBtn: $('#battleBtn'),
-    towerBtn: $('#towerBtn'), rogueBtn: $('#rogueBtn'), towerProgress: $('#towerProgress'),
+    toast: $('#toast'), overlay: $('#overlay'), podium: $('#podium'), editBtn: $('#editBtn'), goBtn: $('#goBtn'),
+    overlayNote: $('#overlayNote'), overlaySub: $('#overlaySub'),
     title: $('.brand h1'), subtitle: $('.brand p'),
   };
 
@@ -634,14 +636,12 @@
       </figure>`).join('');
     const imgs = els.podium.querySelectorAll('img');
     imgs.forEach((img, i) => setSprite(img, team[i].id));
+    els.overlayNote.textContent = `${MODE.icon} ${MODE.name}`;
+    els.goBtn.textContent = MODE.start;
+    els.goBtn.className = `btn primary ${MODE.cls}`;
+    els.overlaySub.textContent = overlaySubtext();
     els.overlay.hidden = false;
-    els.battleBtn.focus();
-
-    // Show where this team's Battle Tower climb stands.
-    const floor = Tower.getRun().floor;
-    els.towerProgress.textContent = floor >= Tower.FLOORS.length
-      ? 'Battle Tower: conquered!'
-      : `Battle Tower: next up Floor ${Tower.ROMAN[floor]} of ${Tower.FLOORS.length}`;
+    els.goBtn.focus();
 
     overlayTimeline?.kill();
     overlayTimeline = gsap.timeline()
@@ -652,7 +652,26 @@
       .add(() => imgs.forEach((img, i) => bob(img, i)));
   }
 
-  // Flash to white, then on to a wild battle or the Battle Tower.
+  // The line under the overlay's buttons: where this team's tower climb stands, or a warning
+  // that setting out replaces an adventure in progress.
+  function overlaySubtext() {
+    if (MODE.id === 'tower') {
+      const floor = Tower.getRun().floor;
+      return floor >= Tower.FLOORS.length
+        ? 'This team has conquered the tower!'
+        : `Next up: Floor ${Tower.ROMAN[floor]} of ${Tower.FLOORS.length}`;
+    }
+    const run = MODE.id === 'adventure' && Adventure.getRun();
+    return run && !run.over ? 'Setting out starts a new adventure in place of the one in progress.' : '';
+  }
+
+  function start() {
+    // An Adventure sets out with the confirmed team (a new one replaces any in progress).
+    if (MODE.id === 'adventure') Adventure.start(state.team.map(p => p.id));
+    goTo(MODE.url);
+  }
+
+  // Flash to white, then on to the chosen mode.
   function goTo(url) {
     overlayTimeline?.kill();
     gsap.to('.overlay-flash', { opacity: 1, duration: 0.35, ease: 'power2.in', onComplete: () => { location.href = url; } });
@@ -706,12 +725,12 @@
 
   function onPad(action) {
     if (!els.overlay.hidden) {
-      const buttons = [els.editBtn, els.battleBtn, els.towerBtn, els.rogueBtn];
+      const buttons = [els.editBtn, els.goBtn];
       const index = buttons.indexOf(document.activeElement);
       if (action === 'back') hideOverlay();
       else if (action === 'left' || action === 'right') {
         buttons[(Math.max(index, 0) + (action === 'right' ? 1 : buttons.length - 1)) % buttons.length].focus();
-      } else if (action === 'confirm' || action === 'start') (buttons[index] || els.battleBtn).click();
+      } else if (action === 'confirm' || action === 'start') (buttons[index] || els.goBtn).click();
       return;
     }
     if (els.detail.classList.contains('open')) {
@@ -804,9 +823,7 @@
     els.random.addEventListener('click', randomTeam);
     els.confirm.addEventListener('click', confirmTeam);
     els.editBtn.addEventListener('click', hideOverlay);
-    els.battleBtn.addEventListener('click', () => goTo('battle.html'));
-    els.towerBtn.addEventListener('click', () => goTo('tower.html'));
-    els.rogueBtn.addEventListener('click', () => goTo('rogue.html'));
+    els.goBtn.addEventListener('click', start);
     els.mute.addEventListener('click', () => {
       state.muted = !state.muted;
       store.set(STORAGE.muted, state.muted);
@@ -859,7 +876,11 @@
     const run = Rogue.getRun();
     els.subtitle.innerHTML = 'Pick 3 one-star (<b class="stars">★</b>) Pokémon with no shared types to start your run'
       + (run && !run.over ? ` · <b>starting replaces your current run (${run.wins} win${run.wins === 1 ? '' : 's'})</b>` : '')
-      + ' · <a href="rogue.html">Back</a>';
+      + ' · <a href="index.html">Change mode</a>';
+  } else {
+    document.title = `${MODE.name} · Choose Your Team`;
+    els.subtitle.innerHTML = `<b class="mode-tag">${MODE.icon} ${MODE.name}</b> Pick 3 Pokémon with no shared types, within the points limit`
+      + ' · <a href="index.html">Change mode</a>';
   }
   renderGens();
   renderTypeOptions();

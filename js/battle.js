@@ -19,9 +19,22 @@
     location.replace('rogue.html');
     return;
   }
-  // Foe gauges fill a little slower than yours, since you need time to work the menus; tower floors
-  // and Rogue runs speed them up as you go.
-  const ENEMY_ATB_SCALE = floorInfo ? floorInfo.atbScale : rogueRun ? Rogue.atbScale(rogueRun.wins) : 1.3;
+  // battle.html?mode=adventure fights the battle on the Adventure stop you've just moved onto.
+  // Anything else (no run, or a stop that isn't a battle) goes back to the map.
+  const adventureRun = params.get('mode') === 'adventure' ? Adventure.getRun() : null;
+  const adventureStop = adventureRun?.pending?.kind === 'battle' ? Adventure.currentNode(adventureRun) : null;
+  if (params.get('mode') === 'adventure' && (!adventureStop || adventureRun.over)) {
+    location.replace('adventure.html');
+    return;
+  }
+  // Foe gauges fill a little slower than yours, since you need time to work the menus; tower floors,
+  // Rogue runs and the Adventure route speed them up as you go.
+  const ENEMY_ATB_SCALE = floorInfo ? floorInfo.atbScale
+    : rogueRun ? Rogue.atbScale(rogueRun.wins)
+      : adventureStop ? Adventure.atbScale(adventureStop.row, adventureStop.type)
+        : 1.3;
+  // The legendary at the end of an Adventure has this much more HP than usual.
+  const BOSS_HP = 1.6;
   const ITEM_SPRITES = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items';
   const ITEMS = [
     { id: 'potion', name: 'Potion', qty: 5, target: 'ally', heal: 20, text: 'Restores 20 HP to one Pokémon.' },
@@ -96,7 +109,8 @@
     paused: false, pending: [],
     // started: gauges are running. evolving: the fighter mid-evolution, while the rest of the battle is frozen.
     started: false, evolving: null, evoQueue: [],
-    items: ITEMS.map(item => ({ ...item })),
+    // An Adventure brings its own bag, which carries over from battle to battle.
+    items: ITEMS.map(item => ({ ...item, qty: adventureRun ? adventureRun.bag[item.id] || 0 : item.qty })),
   };
 
   const rand = (min, max) => min + Math.random() * (max - min);
@@ -131,7 +145,9 @@
   const unitOf = f => (f.side === 'party' ? battle.units : battle.enemyUnits)[f.index];
   const innerOf = unit => unit.querySelector('.unit-inner');
   const imgOf = f => unitOf(f).querySelector('img');
-  const displayName = f => (f.side === 'enemy' ? `${floorInfo ? 'Foe' : 'Wild'} ${f.name}` : f.name);
+  // Trainers' Pokémon are foes; everything else out there is wild.
+  const trainerBattle = Boolean(floorInfo) || adventureStop?.type === 'trainer';
+  const displayName = f => (f.side === 'enemy' ? `${trainerBattle ? 'Foe' : 'Wild'} ${f.name}` : f.name);
   // Maps a clicked unit sprite or HUD row back to its fighter.
   function fighterOf(el) {
     const node = el.closest('.unit, .unit-row');
@@ -161,12 +177,19 @@
   async function loadTeams() {
     // Opening battle.html directly (no saved team) still gives you a party to look at.
     // The saved team is re-fetched so it includes learnsets.
-    const partyIds = rogueRun?.team || readTeam()?.map(p => p.id) || randomIds(3);
+    const partyIds = rogueRun?.team || adventureRun?.team.map(m => m.id) || readTeam()?.map(p => p.id) || randomIds(3);
     const party = await Promise.all(partyIds.map(id => PokeAPI.loadDetails(id)));
     let enemyIds;
     if (floorInfo) enemyIds = await pickByStrength(3, floorInfo.bst, partyIds);
     else if (rogueRun) enemyIds = await pickByStrength(3, PokeAPI.starRange(Rogue.foeStars(rogueRun.wins)), partyIds);
-    else enemyIds = randomIds(3, partyIds);
+    else if (adventureStop?.type === 'boss') {
+      // The legendary stands in the middle, flanked by two strong guards.
+      const boss = pick(Adventure.BOSSES.filter(id => !partyIds.includes(id)));
+      const guards = await pickByStrength(2, [480, 580], [...partyIds, boss]);
+      enemyIds = [guards[0], boss, guards[1]];
+    } else if (adventureStop) {
+      enemyIds = await pickByStrength(3, Adventure.foeRange(adventureStop.row, adventureStop.type), partyIds);
+    } else enemyIds = randomIds(3, partyIds);
     const enemies = await Promise.all(enemyIds.map(id => PokeAPI.loadDetails(id)));
     return { party, enemies };
   }
@@ -1742,11 +1765,22 @@
       if (won) Rogue.recordWin(battle.party.filter(f => f.fainted).map(f => f.index));
       else Rogue.endRun();
     }
+    if (adventureRun) reportAdventure(won);
     Music.play(won ? 'victory' : 'defeat');
     gsap.delayedCall(1.5, () => showResult(won));
   }
 
   function resultCopy(won) {
+    if (adventureStop) {
+      battle.nextUrl = 'adventure.html';
+      if (!won) return { title: 'Adventure over', text: 'Your whole team fainted. The journey ends here.', button: 'Back to the map' };
+      if (adventureStop.type === 'boss') {
+        return { title: 'Adventure complete!', text: `${battle.enemies[1].name} has been defeated. Your journey is a legend!`, button: 'Finish the adventure' };
+      }
+      return adventureStop.type === 'wild'
+        ? { title: 'Victory!', text: 'One of the wild Pokémon could join your team.', button: 'Continue' }
+        : { title: 'Trainer defeated!', text: 'Pick a reward for your bag.', button: 'Continue' };
+    }
     if (rogueRun) {
       battle.nextUrl = 'rogue.html';
       const n = rogueRun.wins + 1;
@@ -1794,7 +1828,9 @@
   function playIntro() {
     const titleCard = floorInfo
       ? { small: `Floor ${Tower.ROMAN[towerFloor - 1]}`, big: floorInfo.name }
-      : rogueRun && { small: 'Rogue run', big: `Battle ${rogueRun.wins + 1}` };
+      : rogueRun ? { small: 'Rogue run', big: `Battle ${rogueRun.wins + 1}` }
+        : adventureStop?.type === 'boss' ? { small: 'Adventure', big: 'Legendary battle' }
+          : adventureStop?.type === 'trainer' && { small: 'Adventure', big: 'Trainer battle' };
     const names = battle.enemies.map(f => f.name);
     const inners = list => list.map(innerOf);
     // Starts with the encounter flash (or on the first click if the browser blocked autoplay).
@@ -1814,7 +1850,9 @@
       .from(els.plates, { opacity: 0, duration: 0.4 }, 1.1)
       .add(() => showMessage(floorInfo
         ? `${floorInfo.trainer} sends out ${names.slice(0, -1).join(', ')} and ${names.at(-1)}!`
-        : `Wild ${names.slice(0, -1).join(', ')} and ${names.at(-1)} appeared!`), 1.2)
+        : adventureStop?.type === 'boss' ? `The legendary ${names[1]} appeared!`
+          : adventureStop?.type === 'trainer' ? `A trainer sends out ${names.slice(0, -1).join(', ')} and ${names.at(-1)}!`
+            : `Wild ${names.slice(0, -1).join(', ')} and ${names.at(-1)} appeared!`), 1.2)
       .add(() => {
         // Everyone starts part of the way to their first charge.
         battle.party.forEach(f => { f.gauge.value = rand(0, 0.9); });
@@ -1837,6 +1875,19 @@
 
   // Wild battles roam outdoors; tower battles happen in the tower's arena, decked in the floor's colour.
   function setupMode() {
+    // An Adventure's legendary waits in a hall like the tower's, hung with violet banners.
+    if (adventureStop?.type === 'boss') {
+      els.field.dataset.biome = 'tower';
+      els.field.style.setProperty('--floor-accent', '#b88bff');
+      buildTowerScenery();
+      buildMotes(true);
+      els.loading.innerHTML = 'Adventure · The legendary awaits<span class="dots"></span>';
+      els.backBtn.textContent = '← Map';
+      els.backBtn.href = 'adventure.html';
+      els.enemyTitle.textContent = 'Legendary';
+      document.title = 'Adventure · Legendary battle';
+      return;
+    }
     if (!floorInfo) {
       els.field.dataset.biome = pick(BIOMES);
       buildScenery();
@@ -1846,6 +1897,14 @@
         els.backBtn.textContent = '← Rogue run';
         els.backBtn.href = 'rogue.html';
         document.title = `Rogue run · Battle ${rogueRun.wins + 1}`;
+      }
+      if (adventureStop) {
+        const label = Adventure.NODE_TYPES[adventureStop.type].label;
+        els.loading.innerHTML = `Adventure · ${label}<span class="dots"></span>`;
+        els.backBtn.textContent = '← Map';
+        els.backBtn.href = 'adventure.html';
+        if (adventureStop.type !== 'wild') els.enemyTitle.textContent = adventureStop.type === 'boss' ? 'Legendary' : 'Trainer';
+        document.title = `Adventure · ${label}`;
       }
       return;
     }
@@ -1858,6 +1917,35 @@
     els.backBtn.href = 'tower.html';
     els.enemyTitle.textContent = floorInfo.trainer;
     document.title = `Battle Tower · Floor ${Tower.ROMAN[towerFloor - 1]}`;
+  }
+
+  // ---------- Adventure ----------
+
+  // Your team arrives with the HP it had after the last stop (fainted ones stay down), and the
+  // legendary boss gets extra HP.
+  function carryOverHp() {
+    battle.party.forEach((f, i) => {
+      const share = adventureRun.team[i]?.hp ?? 1;
+      f.hp = share <= 0 ? 0 : Math.max(1, Math.round(f.maxHp * share));
+      f.fainted = f.hp === 0;
+    });
+    if (adventureStop.type === 'boss') {
+      const boss = battle.enemies[1];
+      boss.maxHp = boss.hp = Math.round(boss.maxHp * BOSS_HP);
+    }
+  }
+
+  function showFaintedAtStart(f) {
+    rowOf(f).classList.add('fainted');
+    unitOf(f).classList.add('fainted');
+    gsap.set(imgOf(f), { filter: 'grayscale(1) brightness(0.7)', opacity: 0.45 });
+  }
+
+  // Reports the battle back to the run: everyone's HP share (after any evolutions) and what's left in the bag.
+  function reportAdventure(won) {
+    const party = battle.party.map(f => ({ id: f.id, hp: f.fainted ? 0 : f.hp / f.maxHp }));
+    const bag = Object.fromEntries(battle.items.map(item => [item.id, item.qty]));
+    Adventure.finishBattle(won, party, bag, battle.enemies.map(f => f.id));
   }
 
   // ---------- Boot ----------
@@ -1878,10 +1966,12 @@
     }
     battle.party = teams.party.map((d, i) => Combat.createFighter(d, 'party', i));
     battle.enemies = teams.enemies.map((d, i) => Combat.createFighter(d, 'enemy', i));
+    if (adventureRun) carryOverHp();
     battle.units = battle.party.map((f, i) => createUnit(f, PLAYER_SPOTS[i]));
     battle.enemyUnits = battle.enemies.map((f, i) => createUnit(f, ENEMY_SPOTS[i]));
     els.units.replaceChildren(...battle.units, ...battle.enemyUnits);
     renderHud();
+    if (adventureRun) battle.party.forEach(updateHp);
     // Fetch everyone's attacks in the background so the menus and enemy AI are ready.
     [...battle.party, ...battle.enemies].forEach(loadMoves);
 
@@ -1890,6 +1980,7 @@
       ...battle.enemies.map(f => loadSprite(imgOf(f), f.id)),
     ]);
     els.loading.remove();
+    battle.party.filter(f => f.fainted).forEach(showFaintedAtStart);
     // Next stages load in the background; their gauges appear once ready.
     [...battle.party, ...battle.enemies].forEach(f => prepareEvolution(f));
     // Advanced is the default; Traditional only if the player picked it before.

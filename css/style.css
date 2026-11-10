@@ -544,7 +544,9 @@ img { image-rendering: pixelated; }
 .btn.rogue-btn { background: linear-gradient(135deg, #3fd6a6, #2a8bd8); color: #04161a; box-shadow: 0 4px 0 #1d5f73; }
 .rogue-pick .brand h1 { color: #5ff0c2; }
 .brand p a { color: inherit; }
+.mode-tag { margin-right: 6px; color: var(--text); }
 .btn.tower-btn { background: linear-gradient(135deg, #c77dff, #6f8bff); color: #fff; box-shadow: 0 4px 0 #4b3a8f; }
+.btn.adventure-btn { background: linear-gradient(135deg, #ffb347, #e8613c); color: #2a1204; box-shadow: 0 4px 0 #8a3a1c; }
 .overlay-sub { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
 
 /* ---------- Narrow screens ---------- */

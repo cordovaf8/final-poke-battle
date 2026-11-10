@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Choose Your Team</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1>Choose Your Team</h1>
+      <p>Pick 3 Pokémon with no shared types, within the points limit</p>
+    </div>
+
+    <div class="team-wrap">
+      <div class="team" id="team" aria-label="Your team">
+        <button type="button" class="slot" data-slot="0"><span class="slot-num">1</span><span class="slot-stage"><img class="slot-sprite" alt=""></span><span class="slot-name">Empty</span></button>
+        <button type="button" class="slot" data-slot="1"><span class="slot-num">2</span><span class="slot-stage"><img class="slot-sprite" alt=""></span><span class="slot-name">Empty</span></button>
+        <button type="button" class="slot" data-slot="2"><span class="slot-num">3</span><span class="slot-stage"><img class="slot-sprite" alt=""></span><span class="slot-name">Empty</span></button>
+      </div>
+      <div class="budget" title="Each Pokémon costs a tenth of its base stat total">
+        <span class="budget-label">Team points</span>
+        <span class="budget-track"><i id="budgetBar"></i></span>
+        <b id="budgetText">0 / 150 pts</b>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn" id="randomBtn">Random</button>
+      <button type="button" class="btn icon" id="muteBtn" aria-label="Mute cries" aria-pressed="false">
+        <svg class="icon-on" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.47 4.47 0 0 0 2.5-4zM14 3.23v2.06a7 7 0 0 1 0 13.42v2.06A9 9 0 0 0 14 3.23z"/></svg>
+        <svg class="icon-off" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M16.5 12A4.5 4.5 0 0 0 14 8v2.18l2.45 2.45c.03-.2.05-.41.05-.63zM19 12c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.8 8.8 0 0 0 21 12a9 9 0 0 0-7-8.77v2.06A7 7 0 0 1 19 12zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a9 9 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z"/></svg>
+      </button>
+      <button type="button" class="btn icon music-toggle" id="musicBtn" aria-label="Turn music off" aria-pressed="true">
+        <svg class="icon-on" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
+        <svg class="icon-off" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M4.27 3 3 4.27l9 9v.28A4 4 0 1 0 14 17v-1.73L19.73 21 21 19.73 4.27 3zM14 7h4V3h-6v5.18l2 2V7z"/></svg>
+      </button>
+      <button type="button" class="btn primary" id="confirmBtn" disabled>0/3 chosen</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="browser">
+      <div class="toolbar">
+        <input type="search" id="search" class="search" placeholder="Search name or number…" autocomplete="off" aria-label="Search Pokémon">
+        <select id="typeFilter" class="select" aria-label="Filter by type"><option value="">All types</option></select>
+      </div>
+      <nav class="gens" id="gens" aria-label="Generation"></nav>
+      <p class="status" id="status" role="status">Loading Pokédex<span class="dots"></span></p>
+      <div class="grid" id="grid"></div>
+    </section>
+
+    <aside class="detail" id="detail" aria-live="polite">
+      <button type="button" class="detail-close" id="detailClose" aria-label="Close details">&times;</button>
+      <div class="detail-stage">
+        <div class="platform"></div>
+        <img class="detail-sprite" id="detailSprite" alt="">
+      </div>
+      <div class="detail-head">
+        <span class="detail-num" id="detailNum"></span>
+        <h2 class="detail-name" id="detailName">&mdash;</h2>
+        <p class="detail-genus" id="detailGenus"></p>
+        <div class="detail-types" id="detailTypes"></div>
+      </div>
+      <p class="detail-flavor" id="detailFlavor"></p>
+      <dl class="facts">
+        <div><dt>Height</dt><dd id="detailHeight">&mdash;</dd></div>
+        <div><dt>Weight</dt><dd id="detailWeight">&mdash;</dd></div>
+        <div><dt>Rating</dt><dd id="detailStars">&mdash;</dd></div>
+        <div><dt>Team cost</dt><dd id="detailCost">&mdash;</dd></div>
+        <div class="wide"><dt>Abilities</dt><dd id="detailAbilities">&mdash;</dd></div>
+      </dl>
+      <div class="stats" id="detailStats"></div>
+      <button type="button" class="btn primary block" id="detailAdd">Add to team</button>
+      <p class="detail-note" id="detailNote" role="status"></p>
+    </aside>
+  </main>
+
+  <div class="sheet-backdrop" id="sheetBackdrop"></div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <div class="pad-legend" aria-hidden="true">
+    <span><i class="pad-btn a">A</i> Pick</span>
+    <span><i class="pad-btn b">B</i> Remove last</span>
+    <span><i class="pad-btn x">X</i> Random</span>
+    <span><i class="pad-btn">LB</i><i class="pad-btn">RB</i> Generation</span>
+    <span><i class="pad-btn">Start</i> Confirm</span>
+    <span><i class="pad-btn">Select</i> Music</span>
+  </div>
+
+  <div class="overlay" id="overlay" hidden>
+    <div class="overlay-flash"></div>
+    <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="overlayTitle">
+      <h2 id="overlayTitle">Team assembled!</h2>
+      <div class="podium" id="podium"></div>
+      <p class="overlay-note" id="overlayNote">Ready for battle</p>
+      <div class="overlay-actions">
+        <button type="button" class="btn" id="editBtn">Edit team</button>
+        <button type="button" class="btn primary" id="goBtn">Start</button>
+      </div>
+      <p class="overlay-sub" id="overlaySub"></p>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/music.js"></script>
+  <script src="js/gamepad.js"></script>
+  <script src="js/modes.js"></script>
+  <script src="js/tower-data.js"></script>
+  <script src="js/rogue-data.js"></script>
+  <script src="js/adventure-data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

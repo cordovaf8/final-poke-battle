@@ -19,11 +19,24 @@ No build step and nothing to install.
 
 An internet connection is needed, since Pokémon data, sprites and cries are loaded from PokéAPI. The Pokédex list and stat totals are cached in `localStorage` after the first visit.
 
-**Music:** the team select screen plays a menu theme, and battles have their own theme plus evolution, victory and defeat jingles. Browsers block audio until you interact with the page, so the music starts on your first click or key press. Use the ♪ button (team select) or **Music on/off** (battle) to toggle it. The setting is remembered.
+**Music:** the menu and team select screens play a menu theme, and battles have their own theme plus evolution, victory and defeat jingles. Browsers block audio until you interact with the page, so the music starts on your first click or key press. Use the ♪ or **Music on/off** button to toggle it. The setting is remembered.
 
 ## How to play
 
-### 1. Build your team
+### 1. Choose a mode
+
+The game opens on the menu (`index.html`). Pick a game mode first, then build a team for it. Once you confirm the team, you head straight into that mode.
+
+| Mode | What it is |
+| --- | --- |
+| 🌿 Wild battle | A quick real-time battle against three random wild Pokémon. |
+| 🏰 Battle Tower | Six floors of ever-tougher trainer battles (see below). |
+| 🎲 Rogue run | Start with three 1★ Pokémon and roll for new teammates after every win (see below). |
+| 🗺️ Adventure | A branching route of battles and events that ends with a legendary Pokémon (see below). |
+
+Each mode's card shows your progress in it, plus a shortcut to pick up where you left off: battle again with your last team, continue a tower climb, or resume a Rogue run or Adventure in progress. Every other screen's **← Menu** button comes back here, and team select has a **Change mode** link.
+
+### 2. Build your team
 
 - Browse every Pokémon (#1–1025) by generation, type or name/number search.
 - Hover a Pokémon for its stats, abilities and Pokédex entry (on phones, tap it).
@@ -48,7 +61,7 @@ Team rules:
 
 Cards that would break a rule are dimmed, and hovering one shows the reason. Press **Confirm team** to head into battle.
 
-### 2. Battle
+### 3. Battle
 
 Your team is on the left and the wild Pokémon are on the right, with each Pokémon's types and star rating shown above it so you can plan matchups at a glance. Every Pokémon has an **ATB gauge** split into **three charges** that fill one after another in real time, based on its Speed. Every action spends charges: the strongest attacks cost 3, middling ones 2, and weak attacks, status moves, Defend, items and Evolve cost 1. Each attack shows its cost as gold pips in the attack list.
 
@@ -109,9 +122,9 @@ Mouse, keyboard and game controllers all work. Controllers use the standard Xbox
 | Music on/off | Music button | | Select |
 | Switch view | View button | V | Y |
 
-### 3. Battle Tower
+### 4. Battle Tower
 
-After confirming your team, choose **Wild battle** for a quick fight against three random Pokémon, **Battle Tower** to climb six floors of trainer battles, or **Rogue run** (see below).
+Choose **Battle Tower** on the menu, then confirm a team to climb six floors of trainer battles.
 
 | Floor | Trainer | Foe strength (BST) | Foe speed |
 | --- | --- | --- | --- |
@@ -129,11 +142,11 @@ After confirming your team, choose **Wild battle** for a quick fight against thr
 - Progress is saved per team, so picking a different team starts a new climb. Your best result is remembered.
 - Tower battles take place in the tower's own arena, decked in each floor's colours, with their own theme music on the tower screen.
 
-### 4. Rogue run
+### 5. Rogue run
 
 A roguelike mode: keep winning with a team that changes as you go. Losing a battle ends the run, and any Pokémon that faints along the way is gone for good.
 
-- **Start:** choose **Rogue run** after confirming a team, then **Choose your team**. Pick three **1★** Pokémon with no shared types (other Pokémon are dimmed). This starting team is kept separate from your usual team.
+- **Start:** choose **Rogue run** on the menu, then **Pick 1★ team**. Pick three **1★** Pokémon with no shared types (other Pokémon are dimmed). This starting team is kept separate from your usual team.
 - **Battles:** each battle is against three wild Pokémon. Foes get a star tougher every two wins (battles 1–2 are 1★, 3–4 are 2★, up to 5★ from battle 9), and their gauges fill a little faster each win, down to your own pace. Your team starts every battle fully healed with a fresh bag.
 - **After each win, roll the die.** It rolls 1 to 5, and you're offered a random Pokémon with that many stars, with its types and stats.
   - Click a team member to swap it out for the new Pokémon, or choose **Keep my team**.
@@ -144,6 +157,28 @@ A roguelike mode: keep winning with a team that changes as you go. Losing a batt
   - Two fainted means two rolls, one after the other, to fill the team back up.
 - **Run over:** when your team falls, the run screen shows how many battles you won. Your best run is remembered. You can also give up a run from the run screen (it takes two clicks).
 - Evolutions during a battle still only last for that battle.
+
+### 6. Adventure
+
+One expedition across a branching route map, built to be played in a single sitting (about 15–25 minutes). Choose **Adventure** on the menu, then confirm a team and **Set out** with it (this replaces any adventure in progress; use **Continue** on the menu to pick one back up). It draws on short-session adventure modes in monster-collecting games and roguelites: a route map you pick your way across, defeated wild Pokémon joining you, travellers offering trades, and a legendary Pokémon waiting at the end.
+
+- **The route:** 8 stops, then the legendary. Each stop leads to one or two stops on the next row, so you choose your path as you go, and a path you leave behind is closed off. Every adventure gets a freshly drawn map.
+
+  | Stop | What happens |
+  | --- | --- |
+  | 🌿 Wild Pokémon | Three wild Pokémon. Win, and one of them can **join your team** in place of a team member, at full health. |
+  | ⚔️ Trainer | A tougher, faster fight (stronger foes, quicker gauges). Win to pick one of three item rewards. |
+  | ❔ Something happens | A random encounter: a berry grove (heal everyone, or fully heal one), a wild Pokémon that wants to tag along, an abandoned camp (take one item, or risk a bite for two), a hot spring (heals and wakes fainted Pokémon) or an Evolution Stone. |
+  | ✚ Pokémon Center | **Rest** (everyone recovers half their max HP, fainted Pokémon revive with half) or **Train** (one Pokémon evolves). |
+  | 🎁 Treasure | Two free items. |
+  | 👑 Legendary | A legendary Pokémon with 60% more HP, flanked by two strong guards, in a violet-bannered hall. Win to complete the adventure. |
+
+- **The first stops** are always wild Pokémon, the middle row is always treasure and the last stop before the legendary is always a Pokémon Center. Trainers and Centers only show up from the second or third row on.
+- **Everything carries over** between stops: each Pokémon's HP, fainted Pokémon (they sit out battles until revived), your bag and evolutions, including ones that happen mid-battle. Your bag starts with 3 Potions and one each of Super Potion, Full Heal, Revive, Ether and X Attack.
+- **Foes get stronger** as you go, from about 1–2★ at the start to 4–5★ just before the legendary, and their gauges speed up.
+- **Lose a battle** (your whole team faints) and the adventure is over. You can also give up from the map (it takes two clicks).
+- Leaving a battle with the **← Map** button keeps you on that stop, so you can fight it again with fresh foes. Anything random on a stop is rolled when you arrive, so refreshing the page can't reroll it.
+- The map remembers how many adventures you've completed.
 
 ## Battle mechanics
 
@@ -203,8 +238,12 @@ A roguelike mode: keep winning with a team that changes as you go. Losing a batt
 ## Project structure
 
 ```
-index.html       Team select screen
-battle.html      Battle screen (wild battles, tower floors and Rogue runs)
+index.html       Menu: choose a game mode
+team.html        Team select screen (team.html?mode=wild|tower|rogue|adventure)
+css/menu.css     Menu styles
+js/menu.js       Menu: mode cards, progress and continue shortcuts
+js/modes.js      The game modes, shared by the menu and team select
+battle.html      Battle screen (wild battles, tower floors, Rogue runs and Adventure stops)
 tower.html       Battle Tower screen
 css/tower.css    Battle Tower styles
 js/tower.js      Battle Tower screen: the tower, climbing, celebrations
@@ -213,6 +252,10 @@ rogue.html       Rogue run screen
 css/rogue.css    Rogue run styles
 js/rogue.js      Rogue run screen: the die roll, offers and swaps
 js/rogue-data.js Saved Rogue run: team, wins, rolls and foe scaling
+adventure.html   Adventure route map
+css/adventure.css Adventure styles
+js/adventure.js  Adventure map screen: travel, stops, events, recruiting, evolutions
+js/adventure-data.js Saved adventure: map generation, team HP, bag, difficulty along the route
 css/style.css    Team select styles
 css/battle.css   Battle styles
 js/api.js        PokéAPI requests, caching, sprites and learnsets

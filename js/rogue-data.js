@@ -2,7 +2,7 @@
 // 1★ Pokémon; after each win a die roll (1–5) offers a random Pokémon with that many stars, which
 // you can swap in for a team member or turn down. Pokémon that faint in a won battle are lost: each
 // gets a roll of its own, and the rolled Pokémon takes its place. Losing a battle ends the run.
-// Shared by index.html (picking the starting team), rogue.html (the run) and battle.html.
+// Shared by team.html (picking the starting team), rogue.html (the run) and battle.html.
 const Rogue = (() => {
   const RUN_KEY = 'rogueRun';
   const BEST_KEY = 'rogueBest';
