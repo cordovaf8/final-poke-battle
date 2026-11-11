@@ -104,6 +104,9 @@
 .av-bag-head { display: flex; justify-content: space-between; align-items: baseline; }
 .av-money { color: var(--treasure); font-size: 10px; }
 .av-bag { display: flex; flex-wrap: wrap; gap: 6px; }
+.av-box .btn.av-shop-btn { width: 100%; margin-top: 10px; border-color: var(--shop); }
+.av-side .btn.av-shop-btn[hidden] { display: none; }
+.av-old { margin-right: 4px; color: var(--muted); font-size: 11px; text-decoration: line-through; }
 .av-item {
   display: flex;
   align-items: center;
@@ -264,6 +267,8 @@ button.av-item:hover, button.av-item:focus-visible { border-color: var(--accent,
 .av-warn { color: #ffb3a6 !important; font-size: 14px; }
 .av-rules { margin: 0; padding-left: 20px; display: grid; gap: 4px; text-align: left; color: #d8d2ea; font-size: 14px; line-height: 1.45; }
 .av-picks { display: grid; gap: 8px; text-align: left; }
+/* Evolution forms to choose from: two columns, so Eevee's eight fit. */
+.av-picks.forms { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .av-pick { cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
 .av-pick:hover:not(:disabled), .av-pick:focus-visible:not(:disabled) {
   transform: translateY(-2px);

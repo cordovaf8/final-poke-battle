@@ -100,6 +100,7 @@
     partyRows: $('#partyRows'), enemyRows: $('#enemyRows'), commandPanel: $('#commandPanel'),
     command: $('#command'), commandTitle: $('#commandTitle'), attackMenu: $('#attackMenu'),
     moveList: $('#moveList'), itemMenu: $('#itemMenu'), itemList: $('#itemList'), flash: $('#flash'),
+    evolveMenu: $('#evolveMenu'), evolveList: $('#evolveList'),
     result: $('#result'), resultTitle: $('#resultTitle'), resultText: $('#resultText'), againBtn: $('#againBtn'),
     music: $('#musicBtn'), viewBtn: $('#viewBtn'), plates: $('#plates'), enemyWindow: $('.enemy-window'),
     floorTitle: $('#floorTitle'), evolveCmd: $('#evolveCmd'), backBtn: $('.back-btn'), enemyTitle: $('.enemy-window .hud-head span'),
@@ -116,6 +117,8 @@
     paused: false, pending: [],
     // started: gauges are running. evolving: the fighter mid-evolution, while the rest of the battle is frozen.
     started: false, evolving: null, evoQueue: [],
+    // evoPick: the open Evolve into menu ({ onPick, back }).
+    evoPick: null,
     // An Adventure brings its own bag, which carries over from battle to battle.
     items: ITEMS.filter(item => adventureRun || !item.adventure)
       .map(item => ({ ...item, qty: adventureRun ? adventureRun.bag[item.id] || 0 : item.qty })),
@@ -1112,8 +1115,10 @@
   // Pokémon with a next stage get an evolution gauge. When it fills, yours can choose Evolve;
   // foes evolve on their next turn. Evolving freezes the battle for a short cutscene.
 
-  // Looks up the next stage in the background and preloads its sprite, then shows the gauge.
-  // Branching lines (Eevee, Poliwhirl…) pick one of their evolutions at random.
+  // Looks up the next stage(s) in the background and preloads their sprites, then shows the gauge.
+  // Branching lines (Eevee, Poliwhirl…) keep every option for your Pokémon, and you pick one from the
+  // Evolve into menu when it evolves; a foe takes one of its evolutions at random.
+  // f.evo: options ([{ to, img }]), plus to and img for the form it will become (the first until picked).
   // from: how full the gauge starts (a middle stage that just evolved starts at half).
   // On an Adventure only your Pokémon get a next stage ready (for Evolution Stones), and no gauge shows.
   async function prepareEvolution(f, from = 0) {
@@ -1121,20 +1126,26 @@
     try {
       const stages = await PokeAPI.loadNextStages(await PokeAPI.loadDetails(f.id));
       if (!stages.length) return;
-      const to = await PokeAPI.loadDetails(pick(stages));
-      const img = document.createElement('img');
-      img.className = 'unit-sprite evo-next';
-      img.alt = to.name;
-      imgOf(f).after(img);
-      await loadSprite(img, to.id);
-      if (!img.naturalWidth || battle.over) {
+      const ids = f.side === 'party' ? stages : [pick(stages)];
+      const options = (await Promise.all(ids.map(async id => {
+        const to = await PokeAPI.loadDetails(id);
+        const img = document.createElement('img');
+        img.className = 'unit-sprite evo-next';
+        img.alt = to.name;
+        imgOf(f).after(img);
+        await loadSprite(img, to.id);
+        if (img.naturalWidth) return { to, img };
         img.remove();
+        return null;
+      }))).filter(Boolean);
+      if (!options.length || battle.over) {
+        options.forEach(o => o.img.remove());
         return;
       }
-      f.evo = { to, img, ready: false, tween: null };
+      f.evo = { options, ...options[0], ready: false, tween: null };
       const bar = rowOf(f).querySelector('.bar.evo');
       bar.hidden = STONE_ONLY;
-      bar.title = `Evolution gauge: evolves into ${to.name}`;
+      bar.title = `Evolution gauge: evolves into ${options.map(o => o.to.name).join(' or ')}`;
       positionPlates();
       if (battle.started) fillEvo(f, from);
     } catch {
@@ -1185,11 +1196,38 @@
     positionPanel();
   }
 
+  // A Pokémon that can evolve more than one way asks which form first.
   function chooseEvolve() {
     const f = battle.party[battle.active];
     if (!f?.evo?.ready) return;
-    endTurn(`What? ${f.name} is evolving!`, 1);
-    evolve(f);
+    const go = form => {
+      setForm(f, form);
+      endTurn(`What? ${f.name} is evolving!`, 1);
+      evolve(f);
+    };
+    if (f.evo.options.length > 1) openEvolveMenu(f, go, 'evolve');
+    else go(0);
+  }
+
+  const setForm = (f, index) => Object.assign(f.evo, f.evo.options[index]);
+
+  // The Evolve into menu: one row per form, with its sprite and types. onPick gets the chosen index;
+  // back is the command to return to (evolve, or items for an Evolution Stone).
+  function openEvolveMenu(f, onPick, back) {
+    battle.evoPick = { onPick, back };
+    els.evolveList.innerHTML = f.evo.options.map(({ to, img }, index) => {
+      const bst = Object.values(to.stats).reduce((a, b) => a + b, 0);
+      return `
+        <button type="button" class="menu-item evo-option" role="menuitem" data-action="evolve-to" data-index="${index}"
+          data-meta="${attr(`${f.name} → ${to.name}`)}" data-help="${attr(`${to.types.map(capitalize).join(' / ')} type · base stat total ${bst}`)}">
+          <img src="${img.src}" alt="">
+          <span class="mv-name">${to.name}</span>
+          <span class="evo-types">${to.types.map(typeBadge).join('')}</span>
+        </button>`;
+    }).join('') + '<span class="pointer"></span>';
+    bobPointer(els.evolveList.querySelector('.pointer'));
+    document.querySelector('.submenu.open')?.classList.remove('open');
+    openSubmenu(els.evolveMenu);
   }
 
   // Swaps in the new form's species, types and stats. Moves and their PP carry over, as do
@@ -1223,6 +1261,8 @@
       return;
     }
     const { to, img: next } = f.evo;
+    // The forms it didn't pick go.
+    f.evo.options.forEach(o => { if (o.img !== next) o.img.remove(); });
     const unit = unitOf(f);
     const old = imgOf(f);
     const from = displayName(f);
@@ -1389,11 +1429,18 @@
       useItem(item, user, user);
       return;
     }
-    beginTargeting({
-      label: item.name,
-      candidates: () => itemTargets(item, user),
-      onConfirm: target => useItem(item, user, target),
-    });
+    // An Evolution Stone on a Pokémon with more than one evolution asks which form first.
+    const use = target => {
+      if (item.id !== 'evo-stone' || target.evo?.options.length < 2) {
+        useItem(item, user, target);
+        return;
+      }
+      openEvolveMenu(target, form => {
+        setForm(target, form);
+        useItem(item, user, target);
+      }, 'items');
+    };
+    beginTargeting({ label: item.name, candidates: () => itemTargets(item, user), onConfirm: use });
   }
 
   function defend() {
@@ -1535,13 +1582,15 @@
     positionPanel();
     els.help.classList.remove('open');
     setPaused(false);
-    const action = open === els.attackMenu ? 'attack' : 'items';
+    const action = open === els.attackMenu ? 'attack' : open === els.evolveMenu ? battle.evoPick?.back || 'evolve' : 'items';
+    battle.evoPick = null;
     select(els.command.querySelector(`[data-action="${action}"]`));
     return true;
   }
 
   function closeMenus() {
     cancelTargeting();
+    battle.evoPick = null;
     document.querySelectorAll('.command, .submenu').forEach(m => m.classList.remove('open'));
     els.commandPanel.classList.remove('engaged', 'expanded');
     els.help.classList.remove('open');
@@ -1705,6 +1754,7 @@
         case 'evolve': chooseEvolve(); break;
         case 'move': chooseMove(Number(item.dataset.index)); break;
         case 'item': chooseItem(Number(item.dataset.index)); break;
+        case 'evolve-to': battle.evoPick?.onPick(Number(item.dataset.index)); break;
       }
     });
     els.hud.addEventListener('contextmenu', e => {

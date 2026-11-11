@@ -1,8 +1,8 @@
 // Adventure mode: one expedition across a branching route map, meant to be played in a single
 // sitting. Your team's HP, fainted Pokémon, bag and evolutions carry over from stop to stop, wild
 // Pokémon you beat can join you, and a legendary Pokémon waits at the end. You set out with three
-// 1★ Pokémon, and they only evolve with Evolution Stones; every win pays out money and items, and
-// Poké Marts along the way sell more (stones included).
+// 1★ Pokémon, and they only evolve with Evolution Stones; every win pays out money and items, which
+// buy more (stones included) from the shop between stops, or for less at a Poké Mart sale.
 // Shared by team.html (picking the team), adventure.html (the map) and battle.html (the battles).
 const Adventure = (() => {
   const RUN_KEY = 'adventureRun';
@@ -28,6 +28,9 @@ const Adventure = (() => {
     'x-attack': { name: 'X Attack', price: 250, text: "Sharply raises the user's Attack for the rest of the battle." },
   };
   const START_MONEY = 500;
+  // Poké Mart stops knock this much off every price.
+  const SALE = 0.3;
+  const priceOf = (id, sale = false) => Math.round((ITEMS[id].price * (sale ? 1 - SALE : 1)) / 10) * 10;
   const START_BAG = { potion: 3, 'super-potion': 2, 'full-heal': 1, revive: 1, ether: 1, 'x-attack': 1, 'evo-stone': 1 };
   // Random finds: commoner items turn up more often.
   const ITEM_WEIGHTS = {
@@ -48,7 +51,7 @@ const Adventure = (() => {
     trainer: { label: 'Trainer', icon: '⚔️', text: 'A tougher, faster fight. Win to pick a reward: Evolution Stones, Full Restores and more.' },
     event: { label: 'Something happens', icon: '❔', text: 'A chance encounter: a trade, a find, a hot spring…' },
     center: { label: 'Pokémon Center', icon: '✚', text: 'Rest to fully heal your team, and shop at the Poké Mart counter.' },
-    shop: { label: 'Poké Mart', icon: '🛒', text: 'Spend your money on items, Evolution Stones included.' },
+    shop: { label: 'Poké Mart', icon: '🛒', text: 'A sale: everything in the shop is 30% off, Evolution Stones included.' },
     treasure: { label: 'Treasure', icon: '🎁', text: 'Three free items for your bag, one of them rare.' },
     boss: { label: 'Legendary', icon: '👑', text: 'A legendary Pokémon and its guards. Win to finish the adventure.' },
   };
@@ -156,7 +159,12 @@ const Adventure = (() => {
   // at (the key of the stop you're on, null before the first), path (every stop visited), pending
   // (whatever the current stop still needs from you), wins (battles won), won and over.
 
-  const getRun = () => read(RUN_KEY, null);
+  // Adventures saved before money existed start with the usual purse.
+  const getRun = () => {
+    const run = read(RUN_KEY, null);
+    if (run && run.money == null) run.money = START_MONEY;
+    return run;
+  };
   const save = run => write(RUN_KEY, run);
   const clears = () => read(CLEARS_KEY, 0);
 
@@ -280,11 +288,13 @@ const Adventure = (() => {
     return run;
   }
 
-  // Buys one of an item, if you can afford it. Doesn't touch whatever the stop still needs.
-  function buy(id) {
+  // Buys one of an item (at the sale price on a Poké Mart stop), if you can afford it. Doesn't touch
+  // whatever the stop still needs.
+  function buy(id, sale = false) {
     const run = getRun();
-    const price = ITEMS[id]?.price;
-    if (!price || (run.money || 0) < price) return run;
+    if (!ITEMS[id]?.price) return run;
+    const price = priceOf(id, sale);
+    if (run.money < price) return run;
     run.money -= price;
     run.bag = addItems(run.bag, { [id]: 1 });
     save(run);
@@ -307,7 +317,7 @@ const Adventure = (() => {
 
   return {
     ITEMS, NODE_TYPES, BOSSES, ROWS, LANES,
-    getRun, start, clear, reachable, currentNode, isBattle, enter, foeRange, atbScale, offerStars, prize,
+    getRun, start, clear, reachable, currentNode, isBattle, enter, foeRange, atbScale, offerStars, prize, priceOf,
     finishBattle, resolve, buy, giveUp, addItems, clears,
   };
 })();

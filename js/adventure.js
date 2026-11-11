@@ -4,7 +4,7 @@
     team: $('#team'), bag: $('#bag'), legend: $('#legend'), progress: $('#progress'), quit: $('#quitBtn'),
     mapWrap: $('#mapWrap'), map: $('#map'), paths: $('#paths'), nodes: $('#nodes'), token: $('#token'), hint: $('#hint'),
     dialog: $('#dialog'), card: $('#card'), kicker: $('#cardKicker'), title: $('#cardTitle'), body: $('#cardBody'),
-    choices: $('#cardChoices'), toast: $('#toast'), flash: $('#flash'), music: $('#musicBtn'), money: $('#money'),
+    choices: $('#cardChoices'), toast: $('#toast'), flash: $('#flash'), music: $('#musicBtn'), money: $('#money'), shopBtn: $('#shopBtn'),
   };
   const ITEM_SPRITES = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items';
   const { ROWS, LANES, NODE_TYPES, ITEMS } = Adventure;
@@ -86,6 +86,10 @@
   // Items marked for the map (healing, revives, Evolution Stones) can be used between stops.
   function renderBag() {
     els.money.textContent = cash(run?.money);
+    // The shop is open between stops; a stop you're on has to be settled first.
+    els.shopBtn.hidden = !run || run.over;
+    els.shopBtn.disabled = Boolean(run?.pending);
+    els.shopBtn.title = run?.pending ? 'Finish this stop first' : 'Buy items and Evolution Stones';
     const bag = run?.bag || {};
     const items = Object.entries(bag).filter(([id, n]) => n > 0 && ITEMS[id]);
     const usable = Boolean(run && !run.over && !run.pending);
@@ -283,7 +287,7 @@
     if (p.kind === 'reward') return rewardDialog(p.options, p.money);
     if (p.kind === 'treasure') return treasureDialog(p.items, p.money);
     if (p.kind === 'center') return centerDialog();
-    if (p.kind === 'shop') return shopDialog({ kicker: kickerOf('shop'), leave: 'Leave', onLeave: () => finish({}) });
+    if (p.kind === 'shop') return shopDialog({ kicker: kickerOf('shop'), leave: 'Leave', onLeave: () => finish({}), sale: true });
     return eventDialog(p);
   }
 
@@ -313,7 +317,7 @@
           <li>HP, fainted Pokémon, your bag and evolutions <b>carry over</b> between stops.</li>
           <li>Every win pays out: wild Pokémon <b>drop items</b> and one can <b>join your team</b>; trainers hand over prizes.</li>
           <li>Pokémon only evolve with an <b>Evolution Stone</b>, which works on any of them with a next stage.</li>
-          <li>Wins also earn <b>money</b>: spend it at Poké Marts and Pokémon Centers. Click items in your bag to use them between stops.</li>
+          <li>Wins also earn <b>money</b>: spend it with the <b>🛒 Shop</b> button under your bag between stops, or for 30% less at a Poké Mart. Click items in your bag to use them.</li>
           <li>If your whole team faints, the adventure is over.</li>
         </ul>
         <div class="av-picks">${team.map(d => monCard(d, { hp: 1 })).join('')}</div>`,
@@ -495,33 +499,43 @@
     });
   }
 
-  // The Poké Mart: buy as much as you can afford, one at a time. Purchases save straight away.
-  function shopDialog({ kicker, leave, onLeave }) {
+  // The shop: buy as much as you can afford, one at a time. Purchases save straight away.
+  // sale: a Poké Mart stop, where everything is cheaper.
+  function shopDialog({ kicker, leave, onLeave, sale = false }) {
     const ids = Object.keys(ITEMS);
-    const money = run.money || 0;
+    const money = run.money;
     showDialog({
-      kicker, title: 'Poké Mart',
-      body: `<p class="av-wallet">You have <b>${cash(money)}</b></p>
+      kicker, title: sale ? 'Poké Mart sale!' : 'Poké Mart',
+      body: `<p class="av-wallet">You have <b>${cash(money)}</b>${sale ? ' · everything is 30% off' : ''}</p>
         <div class="av-shop">${ids.map((id, i) => {
           const item = ITEMS[id];
+          const price = Adventure.priceOf(id, sale);
           return `
-            <button type="button" class="av-ware av-pick" data-i="${i}" ${money < item.price ? 'disabled' : ''} title="${item.text}">
+            <button type="button" class="av-ware av-pick" data-i="${i}" ${money < price ? 'disabled' : ''} title="${item.text}">
               ${itemImg(id)}
               <span class="av-ware-info"><b>${item.name}</b><small>${item.text}</small></span>
-              <span class="av-ware-side"><b class="av-price">${cash(item.price)}</b><small>In bag: ${run.bag[id] || 0}</small></span>
+              <span class="av-ware-side">
+                <b class="av-price">${sale ? `<s class="av-old">${cash(item.price)}</s>` : ''}${cash(price)}</b>
+                <small>In bag: ${run.bag[id] || 0}</small>
+              </span>
             </button>`;
         }).join('')}</div>`,
       picks: i => {
         const id = ids[i];
-        const before = run.money || 0;
-        run = Adventure.buy(id);
-        if ((run.money || 0) === before) return;
+        const before = run.money;
+        run = Adventure.buy(id, sale);
+        if (run.money === before) return;
         renderBag();
-        shopDialog({ kicker, leave, onLeave });
-        toast(`Bought ${article(ITEMS[id].name)} ${ITEMS[id].name} for ${cash(ITEMS[id].price)}.`);
+        shopDialog({ kicker, leave, onLeave, sale });
+        toast(`Bought ${article(ITEMS[id].name)} ${ITEMS[id].name} for ${cash(before - run.money)}.`);
       },
       choices: [{ label: leave, primary: true, onClick: onLeave }],
     });
+  }
+
+  function openShop() {
+    if (busy || !run || run.over || run.pending || !els.dialog.hidden) return;
+    shopDialog({ kicker: kickerOf('shop'), leave: 'Done', onLeave: closeDialog });
   }
 
   // The evolution cutscene, in miniature: the sprite turns to light, flickers between the two
@@ -649,6 +663,19 @@
 
   // ---------- Using items on the map ----------
 
+  // Pokémon with more than one evolution (Eevee, Gloom, Slowpoke…) pick which form to become.
+  async function chooseForm(slot, stages, kicker, onPick, back) {
+    const from = await load(run.team[slot].id);
+    const forms = await Promise.all(stages.map(load));
+    showDialog({
+      kicker, title: `What should ${from.name} evolve into?`,
+      body: `<p>${from.name} can evolve more than one way. Pick its new form:</p>
+        <div class="av-picks forms">${forms.map((d, i) => monCard(d, { index: i })).join('')}</div>`,
+      picks: i => onPick(forms[i].id),
+      choices: [{ label: 'Back', onClick: back }],
+    });
+  }
+
   // Max HP at level 50, to turn a Potion's flat HP into a share of the bar.
   const maxHpOf = d => Combat.createFighter(d, 'party', 0).maxHp;
   const POTIONS = { potion: 20, 'super-potion': 60 };
@@ -672,7 +699,12 @@
         kicker, title: 'Who touches the stone?',
         text: 'Pick a Pokémon to evolve. It keeps its moves and its share of HP.',
         filter: (_, slot) => options.some(o => o.slot === slot),
-        onPick: slot => evolveSlot(slot, pick(options.find(o => o.slot === slot).stages), { bag: spend() }),
+        onPick: slot => {
+          const { stages } = options.find(o => o.slot === slot);
+          const go = toId => evolveSlot(slot, toId, { bag: spend() });
+          if (stages.length > 1) chooseForm(slot, stages, kicker, go, () => useItem(id));
+          else go(stages[0]);
+        },
         back: closeDialog,
       });
       return;
@@ -726,7 +758,7 @@
   // Controller: the D-pad steps through whatever can be pressed right now; A presses it.
   function padTargets() {
     if (!els.dialog.hidden) return [...els.card.querySelectorAll('.av-pick:not(:disabled), .av-choices .btn:not(:disabled)')];
-    return [...els.nodes.querySelectorAll('.av-node.open'), ...(els.quit.hidden ? [] : [els.quit])];
+    return [...els.nodes.querySelectorAll('.av-node.open'), ...[els.shopBtn, els.quit].filter(b => !b.hidden && !b.disabled)];
   }
 
   function bind() {
@@ -735,6 +767,7 @@
       if (node) travel(node.dataset.key);
     });
     els.quit.addEventListener('click', quit);
+    els.shopBtn.addEventListener('click', openShop);
     els.bag.addEventListener('click', e => {
       const item = e.target.closest('.av-item.use');
       if (item && els.dialog.hidden) useItem(item.dataset.item);

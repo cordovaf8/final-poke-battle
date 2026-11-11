@@ -83,7 +83,8 @@ Your team is on the left and the wild Pokémon are on the right, with each Poké
   - Evolving costs one charge and freezes the whole battle for a short cutscene with its own music. The field dims, the Pokémon turns to light and flickers faster and faster between its old and new shapes, then bursts into its new form.
   - The new form gets its new name, types and stats. It keeps its moves, PP, status and stat changes.
   - It also **regains half of the health it had lost**, as a share of max HP. For example, at 40% HP it evolves to 70%.
-  - A middle stage (Machoke, Ivysaur…) gets a new gauge for its next evolution that starts half full. Branching lines like Eevee's evolve into one of their evolutions at random.
+  - A middle stage (Machoke, Ivysaur…) gets a new gauge for its next evolution that starts half full.
+  - **Branching evolutions:** when one of your Pokémon can evolve more than one way (Eevee, Gloom, Poliwhirl, Slowpoke…), **Evolve** opens an **Evolve into** menu listing every form with its sprite and types, so you pick which one it becomes. Back (or Esc) closes it without evolving. Foes that branch evolve into one of their forms at random.
   - Evolutions last for that battle only. Your team is back to its chosen forms for the next one.
 - **Attack animations:** every attack is animated in its type's style.
   - **Contact attacks** (Tackle, Fire Punch…) lunge in and land with a type-coloured impact.
@@ -169,8 +170,8 @@ One expedition across a branching route map, built to be played in a single sitt
   | 🌿 Wild Pokémon | Three wild Pokémon. Win to earn **money**, they **drop one or two items** into your bag, and one of them can **join your team** in place of a team member, at full health. |
   | ⚔️ Trainer | A tougher, faster fight (stronger foes, quicker gauges). Win to earn more **money** and pick one of three item bundles, one of which always holds an Evolution Stone. |
   | ❔ Something happens | A random encounter: a berry grove (heal everyone, or fully heal one), a wild Pokémon that wants to tag along, an abandoned camp (take one item, or risk a bite for two), a hot spring (heals and wakes fainted Pokémon) or an Evolution Stone for your bag. |
-  | ✚ Pokémon Center | **Rest** (everyone is fully healed, fainted Pokémon revive with half their HP). There's a Poké Mart counter too: shop first, then rest to move on. |
-  | 🛒 Poké Mart | Spend your money on items, Evolution Stones included (see prices below). |
+  | ✚ Pokémon Center | **Rest** (everyone is fully healed, fainted Pokémon revive with half their HP). There's a shop counter too: shop first, then rest to move on. |
+  | 🛒 Poké Mart | A sale: everything in the shop is **30% off**, Evolution Stones included. |
   | 🎁 Treasure | Three free items, one of them always a Full Restore, Max Revive or Evolution Stone, plus a pouch of money. |
   | 👑 Legendary | A legendary Pokémon with 40% more HP, flanked by two strong guards, in a violet-bannered hall. Win to complete the adventure. |
 
@@ -182,10 +183,11 @@ One expedition across a branching route map, built to be played in a single sitt
   | --- | --- |
   | Full Restore | Restores all HP and cures any status condition and confusion |
   | Max Revive | Revives a fainted Pokémon with all its HP |
-  | Evolution Stone | The only way to evolve on an Adventure. Works on any Pokémon with a next stage, and evolves it straight away, on the map or in battle |
+  | Evolution Stone | The only way to evolve on an Adventure. Works on any Pokémon with a next stage, and evolves it straight away, on the map or in battle. A Pokémon that can evolve more than one way asks which form you want first |
 
-- **Money (₽):** you set out with ₽500. Wild wins pay ₽200 plus ₽35 per row, trainer wins ₽350 plus ₽60 per row, and treasure holds a little too. The side panel shows how much you have.
-- **Poké Mart prices:**
+- **Money (₽):** you set out with ₽500. Wild wins pay ₽200 plus ₽35 per row, trainer wins ₽350 plus ₽60 per row, and treasure holds a little too. The side panel shows how much you have. (Adventures saved before money was added get the starting ₽500.)
+- **The shop:** the **🛒 Shop** button under your bag opens it any time between stops (it's locked while a stop still needs settling). Each click buys one item and saves straight away.
+- **Shop prices** (30% less at a Poké Mart stop):
 
   | Item | Price | | Item | Price |
   | --- | --- | --- | --- | --- |

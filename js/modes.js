@@ -15,7 +15,7 @@ const Modes = (() => {
     },
     {
       id: 'adventure', name: 'Adventure', icon: '🗺️', url: 'adventure.html', start: 'Set out', cls: 'adventure-btn', color: '#ffb347',
-      text: 'Set out with three 1★ Pokémon across a branching route of battles, events and shops. Earn money, buy Evolution Stones to evolve, then face a legendary.',
+      text: 'Set out with three 1★ Pokémon across a branching route of battles, events and shops. Earn money, buy Evolution Stones in the shop to evolve, then face a legendary.',
     },
   ];
   // Unknown or missing ids fall back to a wild battle.

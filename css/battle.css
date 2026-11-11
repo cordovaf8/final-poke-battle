@@ -782,7 +782,7 @@ body.targeting .unit, body.targeting .enemy-row { cursor: pointer; }
   gap: 2px;
   padding-left: 22px;
 }
-.moves, #itemList {
+.moves, #itemList, #evolveList {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -845,6 +845,17 @@ body.targeting .pane.open { opacity: 0.55; }
   color: var(--atb);
 }
 .bag-item img { width: 26px; height: 26px; }
+/* Evolve into: one row per form a branching Pokémon can become. */
+.menu-item.evo-option {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  color: #9ff0ff;
+}
+.evo-option img { width: 32px; height: 32px; object-fit: contain; image-rendering: pixelated; }
+.evo-types { display: flex; gap: 3px; }
 .mv-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mv-pp { text-align: right; font-variant-numeric: tabular-nums; font-size: 14px; }
 .menu-empty { margin: 4px 0; color: var(--label); font-size: 14px; }
