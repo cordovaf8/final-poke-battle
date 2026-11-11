@@ -77,7 +77,7 @@ Your team is on the left and the wild Pokémon are on the right, with each Poké
 - **Two views:** switch any time with the **View** button (top right), the **V** key or **Y** on a controller. Your choice is remembered.
   - **Advanced** (default): the bottom panel is gone and the battlefield fills the screen. Each Pokémon has a small floating nameplate (name, HP, status, ATB), and the command menu pops up right next to the Pokémon you're commanding, so your eyes stay on the action.
   - **Traditional:** classic layout with your team, commands and the wild Pokémon in a panel along the bottom.
-- **Evolution:** Pokémon that can still evolve, on either side, get a thin rainbow **evolution gauge** under their HP bar.
+- **Evolution:** Pokémon that can still evolve, on either side, get a thin rainbow **evolution gauge** under their HP bar. (Not on an Adventure, where only Evolution Stones evolve Pokémon.)
   - The gauge fills over about 30 seconds of battle (a little slower for foes), and faster whenever the Pokémon lands or takes a hit.
   - When it's full, the gauge shimmers and the Pokémon glows. Your Pokémon get a **✦ Evolve** command, and foes evolve as soon as they have a charge.
   - Evolving costs one charge and freezes the whole battle for a short cutscene with its own music. The field dims, the Pokémon turns to light and flickers faster and faster between its old and new shapes, then bursts into its new form.
@@ -160,28 +160,40 @@ A roguelike mode: keep winning with a team that changes as you go. Losing a batt
 
 ### 6. Adventure
 
-One expedition across a branching route map, built to be played in a single sitting (about 15–25 minutes). Choose **Adventure** on the menu, pick three **1★ Pokémon** with no shared types (like a Rogue run, this team is kept apart from your usual one) and **Set out** (this replaces any adventure in progress; use **Continue** on the menu to pick one back up). Since you start small, every win pays out items, and Evolution Stones let any Pokémon grow up along the way. It draws on short-session adventure modes in monster-collecting games and roguelites: a route map you pick your way across, defeated wild Pokémon joining you, travellers offering trades, and a legendary Pokémon waiting at the end.
+One expedition across a branching route map, built to be played in a single sitting (about 15–25 minutes). Choose **Adventure** on the menu, pick three **1★ Pokémon** with no shared types (like a Rogue run, this team is kept apart from your usual one) and **Set out** (this replaces any adventure in progress; use **Continue** on the menu to pick one back up). Since you start small, every win pays out money and items. There's no evolution gauge on an Adventure: your Pokémon evolve **only with Evolution Stones**, which you can win, find or buy. It draws on short-session adventure modes in monster-collecting games and roguelites: a route map you pick your way across, defeated wild Pokémon joining you, travellers offering trades, and a legendary Pokémon waiting at the end.
 
 - **The route:** 8 stops, then the legendary. Each stop leads to one or two stops on the next row, so you choose your path as you go, and a path you leave behind is closed off. Every adventure gets a freshly drawn map.
 
   | Stop | What happens |
   | --- | --- |
-  | 🌿 Wild Pokémon | Three wild Pokémon. Win, and they **drop one or two items** into your bag, and one of them can **join your team** in place of a team member, at full health. |
-  | ⚔️ Trainer | A tougher, faster fight (stronger foes, quicker gauges). Win to pick one of three item bundles, one of which always holds an Evolution Stone. |
+  | 🌿 Wild Pokémon | Three wild Pokémon. Win to earn **money**, they **drop one or two items** into your bag, and one of them can **join your team** in place of a team member, at full health. |
+  | ⚔️ Trainer | A tougher, faster fight (stronger foes, quicker gauges). Win to earn more **money** and pick one of three item bundles, one of which always holds an Evolution Stone. |
   | ❔ Something happens | A random encounter: a berry grove (heal everyone, or fully heal one), a wild Pokémon that wants to tag along, an abandoned camp (take one item, or risk a bite for two), a hot spring (heals and wakes fainted Pokémon) or an Evolution Stone for your bag. |
-  | ✚ Pokémon Center | **Rest** (everyone is fully healed, fainted Pokémon revive with half their HP) or **Train** (one Pokémon evolves). |
-  | 🎁 Treasure | Three free items, one of them always a Full Restore, Max Revive or Evolution Stone. |
+  | ✚ Pokémon Center | **Rest** (everyone is fully healed, fainted Pokémon revive with half their HP). There's a Poké Mart counter too: shop first, then rest to move on. |
+  | 🛒 Poké Mart | Spend your money on items, Evolution Stones included (see prices below). |
+  | 🎁 Treasure | Three free items, one of them always a Full Restore, Max Revive or Evolution Stone, plus a pouch of money. |
   | 👑 Legendary | A legendary Pokémon with 40% more HP, flanked by two strong guards, in a violet-bannered hall. Win to complete the adventure. |
 
-- **The first stops** are always wild Pokémon, the middle row is always treasure and the last stop before the legendary is always a Pokémon Center. Trainers and Centers only show up from the second or third row on.
-- **Everything carries over** between stops: each Pokémon's HP, fainted Pokémon (they sit out battles until revived), your bag and evolutions, including ones that happen mid-battle. Your bag starts with 3 Potions, 2 Super Potions, an Evolution Stone and one each of Full Heal, Revive, Ether and X Attack.
+- **The first stops** are always wild Pokémon, the middle row is always treasure and the last stop before the legendary is always a Pokémon Center. Trainers, Poké Marts and Centers only show up from the second or third row on.
+- **Everything carries over** between stops: each Pokémon's HP, fainted Pokémon (they sit out battles until revived), your bag, your money and evolutions, including ones from a stone used mid-battle. Your bag starts with 3 Potions, 2 Super Potions, an Evolution Stone and one each of Full Heal, Revive, Ether and X Attack.
 - **Adventure items:** on top of the usual battle items, an Adventure hands out three of its own:
 
   | Item | Effect |
   | --- | --- |
   | Full Restore | Restores all HP and cures any status condition and confusion |
   | Max Revive | Revives a fainted Pokémon with all its HP |
-  | Evolution Stone | Works on any Pokémon with a next stage. On the map it evolves the Pokémon straight away; in battle it fills the evolution gauge, so the Pokémon can choose **Evolve** on its next turn |
+  | Evolution Stone | The only way to evolve on an Adventure. Works on any Pokémon with a next stage, and evolves it straight away, on the map or in battle |
+
+- **Money (₽):** you set out with ₽500. Wild wins pay ₽200 plus ₽35 per row, trainer wins ₽350 plus ₽60 per row, and treasure holds a little too. The side panel shows how much you have.
+- **Poké Mart prices:**
+
+  | Item | Price | | Item | Price |
+  | --- | --- | --- | --- | --- |
+  | Potion | ₽100 | | Max Revive | ₽1,200 |
+  | Super Potion | ₽250 | | Evolution Stone | ₽800 |
+  | Full Restore | ₽900 | | Ether | ₽300 |
+  | Full Heal | ₽150 | | X Attack | ₽250 |
+  | Revive | ₽500 | | | |
 
 - **Using items on the map:** click a Potion, Super Potion, Full Restore, Revive, Max Revive or Evolution Stone in the bag panel to use it between stops. Full Heal, Ether and X Attack only work in battle.
 - **Foes get stronger** as you go, from 1★ like your team at the start to about 3–4★ just before the legendary, and their gauges speed up.

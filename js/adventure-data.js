@@ -1,7 +1,8 @@
 // Adventure mode: one expedition across a branching route map, meant to be played in a single
 // sitting. Your team's HP, fainted Pokémon, bag and evolutions carry over from stop to stop, wild
 // Pokémon you beat can join you, and a legendary Pokémon waits at the end. You set out with three
-// 1★ Pokémon, so every win pays out items, and Evolution Stones let any of them grow up.
+// 1★ Pokémon, and they only evolve with Evolution Stones; every win pays out money and items, and
+// Poké Marts along the way sell more (stones included).
 // Shared by team.html (picking the team), adventure.html (the map) and battle.html (the battles).
 const Adventure = (() => {
   const RUN_KEY = 'adventureRun';
@@ -11,21 +12,22 @@ const Adventure = (() => {
   const PATHS = 4; // random walks that carve out the map
 
   // Same ids as the battle bag (battle.js ITEMS). sprite: the PokéAPI item sprite, when it isn't the id.
-  // map: can also be used from the bag on the route map, between stops.
+  // map: can also be used from the bag on the route map, between stops. price: in a Poké Mart (₽).
   const ITEMS = {
-    potion: { name: 'Potion', map: true, text: 'Restores 20 HP to one Pokémon.' },
-    'super-potion': { name: 'Super Potion', map: true, text: 'Restores 60 HP to one Pokémon.' },
-    'full-restore': { name: 'Full Restore', map: true, text: 'Restores all HP and cures any status condition.' },
-    'full-heal': { name: 'Full Heal', text: 'Cures any status condition and confusion.' },
-    revive: { name: 'Revive', map: true, text: 'Revives a fainted Pokémon with half its HP.' },
-    'max-revive': { name: 'Max Revive', map: true, text: 'Revives a fainted Pokémon with all its HP.' },
+    potion: { name: 'Potion', map: true, price: 100, text: 'Restores 20 HP to one Pokémon.' },
+    'super-potion': { name: 'Super Potion', map: true, price: 250, text: 'Restores 60 HP to one Pokémon.' },
+    'full-restore': { name: 'Full Restore', map: true, price: 900, text: 'Restores all HP and cures any status condition.' },
+    'full-heal': { name: 'Full Heal', price: 150, text: 'Cures any status condition and confusion.' },
+    revive: { name: 'Revive', map: true, price: 500, text: 'Revives a fainted Pokémon with half its HP.' },
+    'max-revive': { name: 'Max Revive', map: true, price: 1200, text: 'Revives a fainted Pokémon with all its HP.' },
     'evo-stone': {
-      name: 'Evolution Stone', sprite: 'shiny-stone', map: true,
-      text: 'Works on any Pokémon with a next stage: evolves it on the map, or fills its evolution gauge in battle.',
+      name: 'Evolution Stone', sprite: 'shiny-stone', map: true, price: 800,
+      text: 'The only way to evolve on an Adventure. Works on any Pokémon with a next stage, on the map or in battle.',
     },
-    ether: { name: 'Ether', text: "Restores 10 PP to each of the user's attacks." },
-    'x-attack': { name: 'X Attack', text: "Sharply raises the user's Attack for the rest of the battle." },
+    ether: { name: 'Ether', price: 300, text: "Restores 10 PP to each of the user's attacks." },
+    'x-attack': { name: 'X Attack', price: 250, text: "Sharply raises the user's Attack for the rest of the battle." },
   };
+  const START_MONEY = 500;
   const START_BAG = { potion: 3, 'super-potion': 2, 'full-heal': 1, revive: 1, ether: 1, 'x-attack': 1, 'evo-stone': 1 };
   // Random finds: commoner items turn up more often.
   const ITEM_WEIGHTS = {
@@ -45,7 +47,8 @@ const Adventure = (() => {
     wild: { label: 'Wild Pokémon', icon: '🌿', text: 'Three wild Pokémon. Beat them for the items they drop, and one may join you.' },
     trainer: { label: 'Trainer', icon: '⚔️', text: 'A tougher, faster fight. Win to pick a reward: Evolution Stones, Full Restores and more.' },
     event: { label: 'Something happens', icon: '❔', text: 'A chance encounter: a trade, a find, a hot spring…' },
-    center: { label: 'Pokémon Center', icon: '✚', text: 'Rest to fully heal your team, or train one Pokémon to evolve.' },
+    center: { label: 'Pokémon Center', icon: '✚', text: 'Rest to fully heal your team, and shop at the Poké Mart counter.' },
+    shop: { label: 'Poké Mart', icon: '🛒', text: 'Spend your money on items, Evolution Stones included.' },
     treasure: { label: 'Treasure', icon: '🎁', text: 'Three free items for your bag, one of them rare.' },
     boss: { label: 'Legendary', icon: '👑', text: 'A legendary Pokémon and its guards. Win to finish the adventure.' },
   };
@@ -140,7 +143,8 @@ const Adventure = (() => {
           wild: 45,
           event: 26,
           trainer: node.row >= 2 ? 16 : 0,
-          center: node.row >= 3 && node.row < ROWS - 2 ? 13 : 0,
+          center: node.row >= 3 && node.row < ROWS - 2 ? 11 : 0,
+          shop: node.row >= 2 ? 11 : 0,
         });
       }
     }
@@ -160,6 +164,7 @@ const Adventure = (() => {
     save({
       team: teamIds.map(id => ({ id, hp: 1 })),
       bag: { ...START_BAG },
+      money: START_MONEY,
       map: generateMap(),
       at: null,
       path: [],
@@ -194,9 +199,11 @@ const Adventure = (() => {
     if (isBattle(node.type)) {
       run.pending = { kind: 'battle', type: node.type };
     } else if (node.type === 'treasure') {
-      run.pending = { kind: 'treasure', items: [weighted(ITEM_WEIGHTS), weighted(ITEM_WEIGHTS), pick(RARE)] };
+      run.pending = { kind: 'treasure', items: [weighted(ITEM_WEIGHTS), weighted(ITEM_WEIGHTS), pick(RARE)], money: 150 + node.row * 25 };
     } else if (node.type === 'center') {
       run.pending = { kind: 'center' };
+    } else if (node.type === 'shop') {
+      run.pending = { kind: 'shop' };
     } else {
       const event = pick(EVENTS);
       run.pending = { kind: 'event', event };
@@ -212,6 +219,9 @@ const Adventure = (() => {
   }
 
   // ---------- Difficulty along the route ----------
+
+  // Prize money for a win at a row (₽).
+  const prize = (row, type) => (type === 'trainer' ? 350 + row * 60 : 200 + row * 35);
 
   // Base-stat-total range for foes at a row: 1★ like your starting team at first, 3–4★ just before
   // the boss, by which time your team should have evolved.
@@ -237,8 +247,10 @@ const Adventure = (() => {
     if (!run || run.pending?.kind !== 'battle') return;
     run.team = party;
     run.bag = bag;
-    const type = run.pending.type;
+    const { type } = run.pending;
+    const row = run.map.nodes[run.at].row;
     if (won) run.wins = (run.wins || 0) + 1;
+    if (won && type !== 'boss') run.money = (run.money || 0) + prize(row, type);
     if (!won) {
       run.over = true;
       run.pending = null;
@@ -251,9 +263,9 @@ const Adventure = (() => {
     } else if (type === 'wild') {
       const drops = Math.random() < 0.5 ? [weighted(ITEM_WEIGHTS), weighted(ITEM_WEIGHTS)] : [weighted(ITEM_WEIGHTS)];
       run.bag = addItems(run.bag, Object.fromEntries(drops.map(id => [id, drops.filter(d => d === id).length])));
-      run.pending = { kind: 'recruit', options: foes, drops };
+      run.pending = { kind: 'recruit', options: foes, drops, money: prize(row, type) };
     } else {
-      run.pending = { kind: 'reward', options: shuffle([pick(STONE_BUNDLES), ...shuffle(BUNDLES).slice(0, 2)]) };
+      run.pending = { kind: 'reward', options: shuffle([pick(STONE_BUNDLES), ...shuffle(BUNDLES).slice(0, 2)]), money: prize(row, type) };
     }
     save(run);
   }
@@ -264,6 +276,17 @@ const Adventure = (() => {
     Object.assign(run, changes);
     run.pending = null;
     if (run.team.every(m => m.hp <= 0)) run.over = true;
+    save(run);
+    return run;
+  }
+
+  // Buys one of an item, if you can afford it. Doesn't touch whatever the stop still needs.
+  function buy(id) {
+    const run = getRun();
+    const price = ITEMS[id]?.price;
+    if (!price || (run.money || 0) < price) return run;
+    run.money -= price;
+    run.bag = addItems(run.bag, { [id]: 1 });
     save(run);
     return run;
   }
@@ -284,7 +307,7 @@ const Adventure = (() => {
 
   return {
     ITEMS, NODE_TYPES, BOSSES, ROWS, LANES,
-    getRun, start, clear, reachable, currentNode, isBattle, enter, foeRange, atbScale, offerStars,
-    finishBattle, resolve, giveUp, addItems, clears,
+    getRun, start, clear, reachable, currentNode, isBattle, enter, foeRange, atbScale, offerStars, prize,
+    finishBattle, resolve, buy, giveUp, addItems, clears,
   };
 })();

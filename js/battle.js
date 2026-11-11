@@ -33,6 +33,9 @@
     : rogueRun ? Rogue.atbScale(rogueRun.wins)
       : adventureStop ? Adventure.atbScale(adventureStop.row, adventureStop.type)
         : 1.3;
+  // On an Adventure nothing evolves on its own: there's no evolution gauge, and your Pokémon evolve
+  // only when you use an Evolution Stone on them.
+  const STONE_ONLY = Boolean(adventureRun);
   // The legendary at the end of an Adventure has this much more HP than usual.
   const BOSS_HP = 1.4;
   const ITEM_SPRITES = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items';
@@ -44,7 +47,7 @@
     { id: 'full-heal', name: 'Full Heal', qty: 2, target: 'afflicted', text: 'Cures any status condition and confusion.' },
     { id: 'revive', name: 'Revive', qty: 2, target: 'fainted', text: 'Revives a fainted Pokémon with half its HP.' },
     { id: 'max-revive', name: 'Max Revive', target: 'fainted', adventure: true, text: 'Revives a fainted Pokémon with all its HP.' },
-    { id: 'evo-stone', name: 'Evolution Stone', sprite: 'shiny-stone', target: 'evolver', adventure: true, text: "Fills a Pokémon's evolution gauge so it can evolve right away." },
+    { id: 'evo-stone', name: 'Evolution Stone', sprite: 'shiny-stone', target: 'evolver', adventure: true, text: 'Evolves a Pokémon with a next stage on the spot.' },
     { id: 'ether', name: 'Ether', qty: 2, target: 'self', text: "Restores 10 PP to each of the user's attacks." },
     { id: 'x-attack', name: 'X Attack', qty: 2, target: 'self', text: "Sharply raises the user's Attack for the rest of the battle." },
   ];
@@ -1112,7 +1115,9 @@
   // Looks up the next stage in the background and preloads its sprite, then shows the gauge.
   // Branching lines (Eevee, Poliwhirl…) pick one of their evolutions at random.
   // from: how full the gauge starts (a middle stage that just evolved starts at half).
+  // On an Adventure only your Pokémon get a next stage ready (for Evolution Stones), and no gauge shows.
   async function prepareEvolution(f, from = 0) {
+    if (STONE_ONLY && f.side === 'enemy') return;
     try {
       const stages = await PokeAPI.loadNextStages(await PokeAPI.loadDetails(f.id));
       if (!stages.length) return;
@@ -1128,7 +1133,7 @@
       }
       f.evo = { to, img, ready: false, tween: null };
       const bar = rowOf(f).querySelector('.bar.evo');
-      bar.hidden = false;
+      bar.hidden = STONE_ONLY;
       bar.title = `Evolution gauge: evolves into ${to.name}`;
       positionPlates();
       if (battle.started) fillEvo(f, from);
@@ -1142,7 +1147,7 @@
 
   function fillEvo(f, from = 0) {
     const evo = f.evo;
-    if (!evo || evo.ready || f.fainted || battle.over) return;
+    if (STONE_ONLY || !evo || evo.ready || f.fainted || battle.over) return;
     const seconds = EVO_SECONDS * (f.side === 'enemy' ? ENEMY_EVO_SCALE : 1);
     evo.tween?.kill();
     evo.tween = gsap.fromTo(evoFill(f), { scaleX: from }, {
@@ -1152,7 +1157,7 @@
 
   // Landing and taking hits charge the gauge faster.
   function chargeEvo(f, amount) {
-    if (!f.evo || f.evo.ready || f.fainted || !battle.started) return;
+    if (STONE_ONLY || !f.evo || f.evo.ready || f.fainted || !battle.started) return;
     const progress = evoProgress(f) + amount;
     if (progress < 1) {
       fillEvo(f, progress);
@@ -1363,10 +1368,8 @@
         revive(target, item.id === 'max-revive' ? 1 : 0.5);
         popup(target, `+${target.hp}`, 'heal', 'Revived!');
       } else if (item.id === 'evo-stone') {
-        if (!target.evo || target.evo.ready || target.fainted) return;
-        target.evo.tween?.kill();
-        glow(target);
-        gsap.to(evoFill(target), { scaleX: 1, duration: 0.5, ease: 'power2.out', onComplete: () => evoReady(target) });
+        if (!target.evo || target.fainted) return;
+        evolve(target);
       } else if (item.id === 'ether') {
         user.moves?.forEach(m => { m.ppLeft = Math.min(m.pp, m.ppLeft + 10); });
         glow(user);
@@ -1794,9 +1797,10 @@
       if (adventureStop.type === 'boss') {
         return { title: 'Adventure complete!', text: `${battle.enemies[1].name} has been defeated. Your journey is a legend!`, button: 'Finish the adventure' };
       }
+      const prize = `You earned ₽${Adventure.prize(adventureStop.row, adventureStop.type).toLocaleString()}.`;
       return adventureStop.type === 'wild'
-        ? { title: 'Victory!', text: 'The wild Pokémon dropped some items, and one of them could join your team.', button: 'Continue' }
-        : { title: 'Trainer defeated!', text: 'Pick a prize for your bag.', button: 'Continue' };
+        ? { title: 'Victory!', text: `${prize} The wild Pokémon dropped some items, and one of them could join your team.`, button: 'Continue' }
+        : { title: 'Trainer defeated!', text: `${prize} Pick a prize for your bag.`, button: 'Continue' };
     }
     if (rogueRun) {
       battle.nextUrl = 'rogue.html';

@@ -7,6 +7,7 @@
   --trainer: #ff6b6b;
   --event: #b88bff;
   --center: #ff8ac2;
+  --shop: #4fb8ff;
   --treasure: #ffd23f;
   --boss: #c9a2ff;
   height: 100vh;
@@ -100,6 +101,8 @@
 .av-mon.fainted img { filter: grayscale(1) brightness(0.6); }
 .av-mon.fainted .av-hp-text { color: var(--danger); font-weight: 700; }
 
+.av-bag-head { display: flex; justify-content: space-between; align-items: baseline; }
+.av-money { color: var(--treasure); font-size: 10px; }
 .av-bag { display: flex; flex-wrap: wrap; gap: 6px; }
 .av-item {
   display: flex;
@@ -188,6 +191,7 @@ button.av-item:hover, button.av-item:focus-visible { border-color: var(--accent,
 .av-node-icon.trainer { --c: var(--trainer); }
 .av-node-icon.event { --c: var(--event); }
 .av-node-icon.center { --c: var(--center); }
+.av-node-icon.shop { --c: var(--shop); }
 .av-node-icon.treasure { --c: var(--treasure); }
 .av-node-icon.boss { --c: var(--boss); }
 .av-node.boss { width: 76px; height: 76px; margin: -38px 0 0 -38px; }
@@ -287,6 +291,32 @@ button.av-item:hover, button.av-item:focus-visible { border-color: var(--accent,
 .av-loot { display: flex; justify-content: center; gap: 28px; padding: 6px 0; }
 .av-loot-item { display: grid; justify-items: center; gap: 4px; font-size: 14px; }
 .av-loot-item img { width: 56px; height: 56px; image-rendering: pixelated; }
+.av-coins { margin: 4px 0 0; text-align: center; }
+.av-coins b, .av-wallet b { color: var(--treasure); }
+.av-wallet { margin: 0 0 8px; text-align: center; }
+.av-shop { display: grid; gap: 6px; max-height: min(52vh, 420px); overflow-y: auto; padding-right: 2px; }
+.av-ware {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.av-ware:hover:not(:disabled), .av-ware:focus-visible { border-color: var(--shop); background: rgba(79, 184, 255, 0.14); outline: none; }
+.av-ware:disabled { opacity: 0.45; cursor: not-allowed; }
+.av-ware img { width: 36px; height: 36px; image-rendering: pixelated; }
+.av-ware-info, .av-ware-side { display: grid; gap: 2px; min-width: 0; }
+.av-ware-info b { font-size: 14px; }
+.av-ware small { font-size: 11px; color: var(--muted); }
+.av-ware-side { justify-items: end; }
+.av-price { color: var(--treasure); font-size: 14px; }
 .av-loot.small { gap: 18px; padding: 0 0 6px; }
 .av-loot.small .av-loot-item { font-size: 12px; }
 .av-loot.small .av-loot-item img { width: 40px; height: 40px; }
