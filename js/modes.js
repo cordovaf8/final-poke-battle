@@ -15,7 +15,7 @@ const Modes = (() => {
     },
     {
       id: 'adventure', name: 'Adventure', icon: '🗺️', url: 'adventure.html', start: 'Set out', cls: 'adventure-btn', color: '#ffb347',
-      text: 'Cross a branching route of battles, events and Pokémon Centers to face a legendary Pokémon.',
+      text: 'Set out with three 1★ Pokémon across a branching route of battles, events and Pokémon Centers. Win items and Evolution Stones, then face a legendary.',
     },
   ];
   // Unknown or missing ids fall back to a wild battle.

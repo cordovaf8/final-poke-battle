@@ -32,7 +32,7 @@ The game opens on the menu (`index.html`). Pick a game mode first, then build a 
 | 🌿 Wild battle | A quick real-time battle against three random wild Pokémon. |
 | 🏰 Battle Tower | Six floors of ever-tougher trainer battles (see below). |
 | 🎲 Rogue run | Start with three 1★ Pokémon and roll for new teammates after every win (see below). |
-| 🗺️ Adventure | A branching route of battles and events that ends with a legendary Pokémon (see below). |
+| 🗺️ Adventure | Start with three 1★ Pokémon on a branching route of battles and events that ends with a legendary Pokémon (see below). |
 
 Each mode's card shows your progress in it, plus a shortcut to pick up where you left off: battle again with your last team, continue a tower climb, or resume a Rogue run or Adventure in progress. Every other screen's **← Menu** button comes back here, and team select has a **Change mode** link.
 
@@ -160,22 +160,31 @@ A roguelike mode: keep winning with a team that changes as you go. Losing a batt
 
 ### 6. Adventure
 
-One expedition across a branching route map, built to be played in a single sitting (about 15–25 minutes). Choose **Adventure** on the menu, then confirm a team and **Set out** with it (this replaces any adventure in progress; use **Continue** on the menu to pick one back up). It draws on short-session adventure modes in monster-collecting games and roguelites: a route map you pick your way across, defeated wild Pokémon joining you, travellers offering trades, and a legendary Pokémon waiting at the end.
+One expedition across a branching route map, built to be played in a single sitting (about 15–25 minutes). Choose **Adventure** on the menu, pick three **1★ Pokémon** with no shared types (like a Rogue run, this team is kept apart from your usual one) and **Set out** (this replaces any adventure in progress; use **Continue** on the menu to pick one back up). Since you start small, every win pays out items, and Evolution Stones let any Pokémon grow up along the way. It draws on short-session adventure modes in monster-collecting games and roguelites: a route map you pick your way across, defeated wild Pokémon joining you, travellers offering trades, and a legendary Pokémon waiting at the end.
 
 - **The route:** 8 stops, then the legendary. Each stop leads to one or two stops on the next row, so you choose your path as you go, and a path you leave behind is closed off. Every adventure gets a freshly drawn map.
 
   | Stop | What happens |
   | --- | --- |
-  | 🌿 Wild Pokémon | Three wild Pokémon. Win, and one of them can **join your team** in place of a team member, at full health. |
-  | ⚔️ Trainer | A tougher, faster fight (stronger foes, quicker gauges). Win to pick one of three item rewards. |
-  | ❔ Something happens | A random encounter: a berry grove (heal everyone, or fully heal one), a wild Pokémon that wants to tag along, an abandoned camp (take one item, or risk a bite for two), a hot spring (heals and wakes fainted Pokémon) or an Evolution Stone. |
-  | ✚ Pokémon Center | **Rest** (everyone recovers half their max HP, fainted Pokémon revive with half) or **Train** (one Pokémon evolves). |
-  | 🎁 Treasure | Two free items. |
-  | 👑 Legendary | A legendary Pokémon with 60% more HP, flanked by two strong guards, in a violet-bannered hall. Win to complete the adventure. |
+  | 🌿 Wild Pokémon | Three wild Pokémon. Win, and they **drop one or two items** into your bag, and one of them can **join your team** in place of a team member, at full health. |
+  | ⚔️ Trainer | A tougher, faster fight (stronger foes, quicker gauges). Win to pick one of three item bundles, one of which always holds an Evolution Stone. |
+  | ❔ Something happens | A random encounter: a berry grove (heal everyone, or fully heal one), a wild Pokémon that wants to tag along, an abandoned camp (take one item, or risk a bite for two), a hot spring (heals and wakes fainted Pokémon) or an Evolution Stone for your bag. |
+  | ✚ Pokémon Center | **Rest** (everyone is fully healed, fainted Pokémon revive with half their HP) or **Train** (one Pokémon evolves). |
+  | 🎁 Treasure | Three free items, one of them always a Full Restore, Max Revive or Evolution Stone. |
+  | 👑 Legendary | A legendary Pokémon with 40% more HP, flanked by two strong guards, in a violet-bannered hall. Win to complete the adventure. |
 
 - **The first stops** are always wild Pokémon, the middle row is always treasure and the last stop before the legendary is always a Pokémon Center. Trainers and Centers only show up from the second or third row on.
-- **Everything carries over** between stops: each Pokémon's HP, fainted Pokémon (they sit out battles until revived), your bag and evolutions, including ones that happen mid-battle. Your bag starts with 3 Potions and one each of Super Potion, Full Heal, Revive, Ether and X Attack.
-- **Foes get stronger** as you go, from about 1–2★ at the start to 4–5★ just before the legendary, and their gauges speed up.
+- **Everything carries over** between stops: each Pokémon's HP, fainted Pokémon (they sit out battles until revived), your bag and evolutions, including ones that happen mid-battle. Your bag starts with 3 Potions, 2 Super Potions, an Evolution Stone and one each of Full Heal, Revive, Ether and X Attack.
+- **Adventure items:** on top of the usual battle items, an Adventure hands out three of its own:
+
+  | Item | Effect |
+  | --- | --- |
+  | Full Restore | Restores all HP and cures any status condition and confusion |
+  | Max Revive | Revives a fainted Pokémon with all its HP |
+  | Evolution Stone | Works on any Pokémon with a next stage. On the map it evolves the Pokémon straight away; in battle it fills the evolution gauge, so the Pokémon can choose **Evolve** on its next turn |
+
+- **Using items on the map:** click a Potion, Super Potion, Full Restore, Revive, Max Revive or Evolution Stone in the bag panel to use it between stops. Full Heal, Ether and X Attack only work in battle.
+- **Foes get stronger** as you go, from 1★ like your team at the start to about 3–4★ just before the legendary, and their gauges speed up.
 - **Lose a battle** (your whole team faints) and the adventure is over. You can also give up from the map (it takes two clicks).
 - Leaving a battle with the **← Map** button keeps you on that stop, so you can fight it again with fresh foes. Anything random on a stop is rolled when you arrive, so refreshing the page can't reroll it.
 - The map remembers how many adventures you've completed.

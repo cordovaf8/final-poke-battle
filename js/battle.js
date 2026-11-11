@@ -34,13 +34,17 @@
       : adventureStop ? Adventure.atbScale(adventureStop.row, adventureStop.type)
         : 1.3;
   // The legendary at the end of an Adventure has this much more HP than usual.
-  const BOSS_HP = 1.6;
+  const BOSS_HP = 1.4;
   const ITEM_SPRITES = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items';
+  // adventure: only carried on an Adventure, which hands them out as rewards. sprite: when it isn't the id.
   const ITEMS = [
     { id: 'potion', name: 'Potion', qty: 5, target: 'ally', heal: 20, text: 'Restores 20 HP to one Pokémon.' },
     { id: 'super-potion', name: 'Super Potion', qty: 3, target: 'ally', heal: 60, text: 'Restores 60 HP to one Pokémon.' },
+    { id: 'full-restore', name: 'Full Restore', target: 'restorable', adventure: true, text: 'Restores all HP and cures any status condition and confusion.' },
     { id: 'full-heal', name: 'Full Heal', qty: 2, target: 'afflicted', text: 'Cures any status condition and confusion.' },
     { id: 'revive', name: 'Revive', qty: 2, target: 'fainted', text: 'Revives a fainted Pokémon with half its HP.' },
+    { id: 'max-revive', name: 'Max Revive', target: 'fainted', adventure: true, text: 'Revives a fainted Pokémon with all its HP.' },
+    { id: 'evo-stone', name: 'Evolution Stone', sprite: 'shiny-stone', target: 'evolver', adventure: true, text: "Fills a Pokémon's evolution gauge so it can evolve right away." },
     { id: 'ether', name: 'Ether', qty: 2, target: 'self', text: "Restores 10 PP to each of the user's attacks." },
     { id: 'x-attack', name: 'X Attack', qty: 2, target: 'self', text: "Sharply raises the user's Attack for the rest of the battle." },
   ];
@@ -110,7 +114,8 @@
     // started: gauges are running. evolving: the fighter mid-evolution, while the rest of the battle is frozen.
     started: false, evolving: null, evoQueue: [],
     // An Adventure brings its own bag, which carries over from battle to battle.
-    items: ITEMS.map(item => ({ ...item, qty: adventureRun ? adventureRun.bag[item.id] || 0 : item.qty })),
+    items: ITEMS.filter(item => adventureRun || !item.adventure)
+      .map(item => ({ ...item, qty: adventureRun ? adventureRun.bag[item.id] || 0 : item.qty })),
   };
 
   const rand = (min, max) => min + Math.random() * (max - min);
@@ -1088,13 +1093,14 @@
     activateNext();
   }
 
-  function revive(f) {
+  // share: how much of its max HP it comes back with.
+  function revive(f, share = 0.5) {
     f.fainted = false;
     unitOf(f).classList.remove('fainted');
     rowOf(f).classList.remove('fainted');
     gsap.to(imgOf(f), { filter: 'grayscale(0) brightness(1)', opacity: 1, duration: 0.5, clearProps: 'filter' });
     Fx.heal(imgOf(f));
-    setHp(f, Math.floor(f.maxHp / 2));
+    setHp(f, Math.max(1, Math.floor(f.maxHp * share)));
     runGauge(f);
     if (battle.started) fillEvo(f, evoProgress(f));
   }
@@ -1330,6 +1336,8 @@
     if (item.target === 'ally') return living(battle.party);
     if (item.target === 'fainted') return battle.party.filter(p => p.fainted);
     if (item.target === 'afflicted') return living(battle.party).filter(p => p.status || p.confused);
+    if (item.target === 'restorable') return living(battle.party).filter(p => p.hp < p.maxHp || p.status || p.confused);
+    if (item.target === 'evolver') return living(battle.party).filter(p => p.evo && !p.evo.ready);
     return [user];
   }
 
@@ -1346,10 +1354,19 @@
         cure(target);
         glow(target);
         popup(target, 'Cured', 'heal');
-      } else if (item.id === 'revive') {
+      } else if (item.id === 'full-restore') {
+        target.confused = 0;
+        cure(target);
+        heal(target, target.maxHp, 'Restored!');
+      } else if (item.id === 'revive' || item.id === 'max-revive') {
         if (!target.fainted) return;
-        revive(target);
+        revive(target, item.id === 'max-revive' ? 1 : 0.5);
         popup(target, `+${target.hp}`, 'heal', 'Revived!');
+      } else if (item.id === 'evo-stone') {
+        if (!target.evo || target.evo.ready || target.fainted) return;
+        target.evo.tween?.kill();
+        glow(target);
+        gsap.to(evoFill(target), { scaleX: 1, duration: 0.5, ease: 'power2.out', onComplete: () => evoReady(target) });
       } else if (item.id === 'ether') {
         user.moves?.forEach(m => { m.ppLeft = Math.min(m.pp, m.ppLeft + 10); });
         glow(user);
@@ -1572,7 +1589,7 @@
       return `
         <button type="button" class="menu-item bag-item${usable ? '' : ' disabled'}" role="menuitem"
           data-action="item" data-index="${index}" data-meta="${attr(item.name)}" data-help="${attr(item.text)}">
-          <img src="${ITEM_SPRITES}/${item.id}.png" alt="">
+          <img src="${ITEM_SPRITES}/${item.sprite || item.id}.png" alt="">
           <span class="mv-name">${item.name}</span>
           <span class="mv-pp">×${item.qty}</span>
         </button>`;
@@ -1778,8 +1795,8 @@
         return { title: 'Adventure complete!', text: `${battle.enemies[1].name} has been defeated. Your journey is a legend!`, button: 'Finish the adventure' };
       }
       return adventureStop.type === 'wild'
-        ? { title: 'Victory!', text: 'One of the wild Pokémon could join your team.', button: 'Continue' }
-        : { title: 'Trainer defeated!', text: 'Pick a reward for your bag.', button: 'Continue' };
+        ? { title: 'Victory!', text: 'The wild Pokémon dropped some items, and one of them could join your team.', button: 'Continue' }
+        : { title: 'Trainer defeated!', text: 'Pick a prize for your bag.', button: 'Continue' };
     }
     if (rogueRun) {
       battle.nextUrl = 'rogue.html';

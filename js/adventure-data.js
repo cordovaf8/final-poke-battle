@@ -1,7 +1,8 @@
 // Adventure mode: one expedition across a branching route map, meant to be played in a single
 // sitting. Your team's HP, fainted Pokémon, bag and evolutions carry over from stop to stop, wild
-// Pokémon you beat can join you, and a legendary Pokémon waits at the end.
-// Shared by adventure.html (the map) and battle.html (the battles along the way).
+// Pokémon you beat can join you, and a legendary Pokémon waits at the end. You set out with three
+// 1★ Pokémon, so every win pays out items, and Evolution Stones let any of them grow up.
+// Shared by team.html (picking the team), adventure.html (the map) and battle.html (the battles).
 const Adventure = (() => {
   const RUN_KEY = 'adventureRun';
   const CLEARS_KEY = 'adventureClears';
@@ -9,31 +10,43 @@ const Adventure = (() => {
   const LANES = 4;
   const PATHS = 4; // random walks that carve out the map
 
-  // Same ids as the battle bag (battle.js ITEMS).
+  // Same ids as the battle bag (battle.js ITEMS). sprite: the PokéAPI item sprite, when it isn't the id.
+  // map: can also be used from the bag on the route map, between stops.
   const ITEMS = {
-    potion: { name: 'Potion', text: 'Restores 20 HP to one Pokémon.' },
-    'super-potion': { name: 'Super Potion', text: 'Restores 60 HP to one Pokémon.' },
+    potion: { name: 'Potion', map: true, text: 'Restores 20 HP to one Pokémon.' },
+    'super-potion': { name: 'Super Potion', map: true, text: 'Restores 60 HP to one Pokémon.' },
+    'full-restore': { name: 'Full Restore', map: true, text: 'Restores all HP and cures any status condition.' },
     'full-heal': { name: 'Full Heal', text: 'Cures any status condition and confusion.' },
-    revive: { name: 'Revive', text: 'Revives a fainted Pokémon with half its HP.' },
+    revive: { name: 'Revive', map: true, text: 'Revives a fainted Pokémon with half its HP.' },
+    'max-revive': { name: 'Max Revive', map: true, text: 'Revives a fainted Pokémon with all its HP.' },
+    'evo-stone': {
+      name: 'Evolution Stone', sprite: 'shiny-stone', map: true,
+      text: 'Works on any Pokémon with a next stage: evolves it on the map, or fills its evolution gauge in battle.',
+    },
     ether: { name: 'Ether', text: "Restores 10 PP to each of the user's attacks." },
     'x-attack': { name: 'X Attack', text: "Sharply raises the user's Attack for the rest of the battle." },
   };
-  const START_BAG = { potion: 3, 'super-potion': 1, 'full-heal': 1, revive: 1, ether: 1, 'x-attack': 1 };
-  // Treasure draws: commoner items appear more often.
-  const ITEM_WEIGHTS = { potion: 5, 'super-potion': 4, 'full-heal': 3, revive: 2, ether: 2, 'x-attack': 2 };
-  // What a beaten trainer offers: pick one bundle.
+  const START_BAG = { potion: 3, 'super-potion': 2, 'full-heal': 1, revive: 1, ether: 1, 'x-attack': 1, 'evo-stone': 1 };
+  // Random finds: commoner items turn up more often.
+  const ITEM_WEIGHTS = {
+    potion: 4, 'super-potion': 5, 'full-restore': 2, 'full-heal': 2, revive: 3, 'max-revive': 1, 'evo-stone': 2, ether: 2, 'x-attack': 2,
+  };
+  // The best finds, one of which every treasure chest holds.
+  const RARE = ['full-restore', 'max-revive', 'evo-stone'];
+  // What a beaten trainer offers: pick one of three bundles, one of which always holds a stone.
+  const STONE_BUNDLES = [{ 'evo-stone': 1, 'super-potion': 2 }, { 'evo-stone': 1, revive: 1 }, { 'evo-stone': 2 }];
   const BUNDLES = [
-    { potion: 3 }, { 'super-potion': 2 }, { revive: 1 }, { 'full-heal': 2 }, { ether: 2 }, { 'x-attack': 2 },
-    { potion: 1, revive: 1 }, { 'super-potion': 1, 'full-heal': 1 },
+    { 'full-restore': 2 }, { 'max-revive': 1, potion: 2 }, { 'super-potion': 3 }, { revive: 2, 'full-heal': 1 },
+    { 'full-restore': 1, revive: 1 }, { ether: 2, 'x-attack': 2 }, { 'super-potion': 2, 'full-heal': 2 },
   ];
 
   // Stops on the map.
   const NODE_TYPES = {
-    wild: { label: 'Wild Pokémon', icon: '🌿', text: 'Three wild Pokémon. Beat them and one may join you.' },
-    trainer: { label: 'Trainer', icon: '⚔️', text: 'A tougher, faster fight. Win to pick a reward for your bag.' },
+    wild: { label: 'Wild Pokémon', icon: '🌿', text: 'Three wild Pokémon. Beat them for the items they drop, and one may join you.' },
+    trainer: { label: 'Trainer', icon: '⚔️', text: 'A tougher, faster fight. Win to pick a reward: Evolution Stones, Full Restores and more.' },
     event: { label: 'Something happens', icon: '❔', text: 'A chance encounter: a trade, a find, a hot spring…' },
-    center: { label: 'Pokémon Center', icon: '✚', text: 'Rest to heal your team, or train one Pokémon to evolve.' },
-    treasure: { label: 'Treasure', icon: '🎁', text: 'Free items for your bag.' },
+    center: { label: 'Pokémon Center', icon: '✚', text: 'Rest to fully heal your team, or train one Pokémon to evolve.' },
+    treasure: { label: 'Treasure', icon: '🎁', text: 'Three free items for your bag, one of them rare.' },
     boss: { label: 'Legendary', icon: '👑', text: 'A legendary Pokémon and its guards. Win to finish the adventure.' },
   };
   const EVENTS = ['grove', 'joiner', 'camp', 'spring', 'stone'];
@@ -181,7 +194,7 @@ const Adventure = (() => {
     if (isBattle(node.type)) {
       run.pending = { kind: 'battle', type: node.type };
     } else if (node.type === 'treasure') {
-      run.pending = { kind: 'treasure', items: [weighted(ITEM_WEIGHTS), weighted(ITEM_WEIGHTS)] };
+      run.pending = { kind: 'treasure', items: [weighted(ITEM_WEIGHTS), weighted(ITEM_WEIGHTS), pick(RARE)] };
     } else if (node.type === 'center') {
       run.pending = { kind: 'center' };
     } else {
@@ -200,15 +213,16 @@ const Adventure = (() => {
 
   // ---------- Difficulty along the route ----------
 
-  // Base-stat-total range for foes at a row: about 1–2★ at the start, 4–5★ just before the boss.
+  // Base-stat-total range for foes at a row: 1★ like your starting team at first, 3–4★ just before
+  // the boss, by which time your team should have evolved.
   function foeRange(row, type) {
-    const lift = type === 'trainer' ? 45 : 0;
-    return [250 + row * 40 + lift, 400 + row * 32 + lift];
+    const lift = type === 'trainer' ? 40 : 0;
+    return [220 + row * 42 + lift, 340 + row * 36 + lift];
   }
   // Foe gauges: wild ones start slow and speed up along the route; trainers are quicker.
   const atbScale = (row, type) => {
-    if (type === 'boss') return 1.05;
-    return Math.max(1.05, (type === 'trainer' ? 1.25 : 1.38) - row * 0.03);
+    if (type === 'boss') return 1.08;
+    return Math.max(1.08, (type === 'trainer' ? 1.28 : 1.42) - row * 0.03);
   };
   // Star rating of Pokémon offered by events.
   const offerStars = row => Math.min(5, 2 + Math.floor(row / 2));
@@ -217,6 +231,7 @@ const Adventure = (() => {
 
   // Called by battle.html when a battle ends. party: [{ id, hp }] after the fight (evolutions
   // included), bag: what's left, foes: the beaten Pokémon's ids (for recruiting).
+  // Beaten wild Pokémon drop an item or two, which go straight into the bag.
   function finishBattle(won, party, bag, foes) {
     const run = getRun();
     if (!run || run.pending?.kind !== 'battle') return;
@@ -234,9 +249,11 @@ const Adventure = (() => {
       run.pending = null;
       write(CLEARS_KEY, clears() + 1);
     } else if (type === 'wild') {
-      run.pending = { kind: 'recruit', options: foes };
+      const drops = Math.random() < 0.5 ? [weighted(ITEM_WEIGHTS), weighted(ITEM_WEIGHTS)] : [weighted(ITEM_WEIGHTS)];
+      run.bag = addItems(run.bag, Object.fromEntries(drops.map(id => [id, drops.filter(d => d === id).length])));
+      run.pending = { kind: 'recruit', options: foes, drops };
     } else {
-      run.pending = { kind: 'reward', options: shuffle(BUNDLES).slice(0, 3) };
+      run.pending = { kind: 'reward', options: shuffle([pick(STONE_BUNDLES), ...shuffle(BUNDLES).slice(0, 2)]) };
     }
     save(run);
   }

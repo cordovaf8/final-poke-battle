@@ -111,6 +111,8 @@
   font-size: 12px;
 }
 .av-item img { width: 28px; height: 28px; }
+button.av-item { border: 1px solid transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+button.av-item:hover, button.av-item:focus-visible { border-color: var(--accent, #ffb347); background: rgba(255, 179, 71, 0.16); outline: none; }
 
 .av-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; font-size: 12px; color: var(--muted); }
 .av-key { display: flex; align-items: center; gap: 6px; }
@@ -250,6 +252,7 @@
   letter-spacing: 0.12em;
   color: var(--av);
 }
+.av-kicker img { width: 28px; height: 28px; image-rendering: pixelated; }
 .av-kicker .av-node-icon { width: 26px; height: 26px; font-size: 13px; border-width: 2px; }
 .av-card h2 { margin: 0; font: 16px/1.5 'Press Start 2P', monospace; color: var(--text); }
 .av-body { display: grid; gap: 10px; }
@@ -284,6 +287,9 @@
 .av-loot { display: flex; justify-content: center; gap: 28px; padding: 6px 0; }
 .av-loot-item { display: grid; justify-items: center; gap: 4px; font-size: 14px; }
 .av-loot-item img { width: 56px; height: 56px; image-rendering: pixelated; }
+.av-loot.small { gap: 18px; padding: 0 0 6px; }
+.av-loot.small .av-loot-item { font-size: 12px; }
+.av-loot.small .av-loot-item img { width: 40px; height: 40px; }
 
 .av-evo { position: relative; display: grid; place-items: center; height: 170px; }
 .av-evo img { position: absolute; max-width: 150px; max-height: 150px; image-rendering: pixelated; }

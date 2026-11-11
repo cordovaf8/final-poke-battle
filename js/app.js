@@ -9,10 +9,13 @@
     'special-attack': 'Sp. Atk', 'special-defense': 'Sp. Def', speed: 'Speed',
   };
   // team.html?mode=… picks a team for the mode chosen on the menu, and confirming heads straight into it.
-  // mode=rogue picks the starting team of a Rogue run: 1★ Pokémon only, kept apart from your usual team.
+  // mode=rogue and mode=adventure pick the starting team of a run: 1★ Pokémon only, kept apart from
+  // your usual team, and confirming starts the run straight away.
   const MODE = Modes.get(new URLSearchParams(location.search).get('mode'));
   const ROGUE = MODE.id === 'rogue';
-  const STORAGE = { team: 'pokemonTeam', draft: ROGUE ? 'rogueTeamDraft' : 'pokemonTeamDraft', muted: 'pokemonMuted' };
+  const ONE_STAR = ROGUE || MODE.id === 'adventure';
+  const RUN_NAME = ROGUE ? 'a Rogue run' : 'an Adventure';
+  const STORAGE = { team: 'pokemonTeam', draft: ONE_STAR ? `${MODE.id}TeamDraft` : 'pokemonTeamDraft', muted: 'pokemonMuted' };
 
   const $ = sel => document.querySelector(sel);
   const els = {
@@ -60,8 +63,8 @@
   // Why p can't join the current team, or '' if it can. Cost and stars are only checked once known.
   function ruleViolation(p) {
     const bst = PokeAPI.cachedBst(p.id);
-    if (ROGUE && bst != null && PokeAPI.starsOf(bst) !== 1) {
-      return `${p.displayName} is ${PokeAPI.starsOf(bst)}★ — a Rogue run starts with 1★ Pokémon`;
+    if (ONE_STAR && bst != null && PokeAPI.starsOf(bst) !== 1) {
+      return `${p.displayName} is ${PokeAPI.starsOf(bst)}★ — ${RUN_NAME} starts with 1★ Pokémon`;
     }
     const clash = state.team.find(m => m.id !== p.id && m.types.some(t => p.types.includes(t)));
     if (clash) {
@@ -150,7 +153,7 @@
   function updateConfirm() {
     const full = state.team.length === MAX_TEAM;
     els.confirm.disabled = !full;
-    els.confirm.textContent = full ? (ROGUE ? 'Start run' : 'Confirm team') : `${state.team.length}/${MAX_TEAM} chosen`;
+    els.confirm.textContent = full ? (ONE_STAR ? MODE.start : 'Confirm team') : `${state.team.length}/${MAX_TEAM} chosen`;
     if (full && !confirmPulse) {
       confirmPulse = gsap.to(els.confirm, { scale: 1.07, duration: 0.6, repeat: -1, yoyo: true, ease: 'sine.inOut' });
     } else if (!full && confirmPulse) {
@@ -571,7 +574,7 @@
         for (const p of batch) {
           const cost = costFor(p.id);
           if (picks.length === MAX_TEAM || cost == null) continue;
-          if (ROGUE && PokeAPI.starsOf(PokeAPI.cachedBst(p.id)) !== 1) continue;
+          if (ONE_STAR && PokeAPI.starsOf(PokeAPI.cachedBst(p.id)) !== 1) continue;
           if (picks.some(q => q.types.some(t => p.types.includes(t)))) continue;
           // Leave at least ~30 pts per remaining slot so the team can still be finished.
           const slotsAfter = MAX_TEAM - picks.length - 1;
@@ -600,11 +603,11 @@
 
   async function confirmTeam() {
     if (state.team.length !== MAX_TEAM) return;
-    if (ROGUE) {
+    if (ONE_STAR) {
       // A new run replaces any run in progress; your usual team is left as it was.
-      Rogue.start(state.team.map(p => p.id));
+      (ROGUE ? Rogue : Adventure).start(state.team.map(p => p.id));
       store.set(STORAGE.draft, []);
-      location.href = 'rogue.html';
+      location.href = MODE.url;
       return;
     }
     els.confirm.disabled = true;
@@ -652,22 +655,16 @@
       .add(() => imgs.forEach((img, i) => bob(img, i)));
   }
 
-  // The line under the overlay's buttons: where this team's tower climb stands, or a warning
-  // that setting out replaces an adventure in progress.
+  // The line under the overlay's buttons: where this team's tower climb stands.
   function overlaySubtext() {
-    if (MODE.id === 'tower') {
-      const floor = Tower.getRun().floor;
-      return floor >= Tower.FLOORS.length
-        ? 'This team has conquered the tower!'
-        : `Next up: Floor ${Tower.ROMAN[floor]} of ${Tower.FLOORS.length}`;
-    }
-    const run = MODE.id === 'adventure' && Adventure.getRun();
-    return run && !run.over ? 'Setting out starts a new adventure in place of the one in progress.' : '';
+    if (MODE.id !== 'tower') return '';
+    const floor = Tower.getRun().floor;
+    return floor >= Tower.FLOORS.length
+      ? 'This team has conquered the tower!'
+      : `Next up: Floor ${Tower.ROMAN[floor]} of ${Tower.FLOORS.length}`;
   }
 
   function start() {
-    // An Adventure sets out with the confirmed team (a new one replaces any in progress).
-    if (MODE.id === 'adventure') Adventure.start(state.team.map(p => p.id));
     goTo(MODE.url);
   }
 
@@ -876,6 +873,12 @@
     const run = Rogue.getRun();
     els.subtitle.innerHTML = 'Pick 3 one-star (<b class="stars">★</b>) Pokémon with no shared types to start your run'
       + (run && !run.over ? ` · <b>starting replaces your current run (${run.wins} win${run.wins === 1 ? '' : 's'})</b>` : '')
+      + ' · <a href="index.html">Change mode</a>';
+  } else if (MODE.id === 'adventure') {
+    document.title = 'Adventure · Choose 3';
+    const run = Adventure.getRun();
+    els.subtitle.innerHTML = `<b class="mode-tag">${MODE.icon} ${MODE.name}</b> Pick 3 one-star (<b class="stars">★</b>) Pokémon with no shared types to set out with`
+      + (run && !run.over ? ' · <b>setting out replaces the adventure in progress</b>' : '')
       + ' · <a href="index.html">Change mode</a>';
   } else {
     document.title = `${MODE.name} · Choose Your Team`;

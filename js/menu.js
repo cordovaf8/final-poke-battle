@@ -64,7 +64,7 @@
           <p class="mn-text">${mode.text}</p>
           <p class="mn-status">${status}</p>
           <div class="mn-actions">
-            <button type="button" class="btn primary ${mode.cls}" data-url="${Modes.teamUrl(mode.id)}">${mode.id === 'rogue' ? 'Pick 1★ team' : 'Choose team'}</button>
+            <button type="button" class="btn primary ${mode.cls}" data-url="${Modes.teamUrl(mode.id)}">${mode.id === 'rogue' || mode.id === 'adventure' ? 'Pick 1★ team' : 'Choose team'}</button>
             ${continueTo ? `<button type="button" class="btn" data-url="${continueTo.url}">${continueTo.label}</button>` : ''}
           </div>
         </article>`;

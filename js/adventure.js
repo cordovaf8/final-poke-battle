@@ -24,7 +24,7 @@
   const typeBadge = t => `<span class="type" style="--type: var(--${t})">${t}</span>`;
   const bstOf = d => Object.values(d.stats).reduce((a, b) => a + b, 0);
   const pct = share => `${Math.round(share * 100)}%`;
-  const itemImg = id => `<img src="${ITEM_SPRITES}/${id}.png" alt="">`;
+  const itemImg = id => `<img src="${ITEM_SPRITES}/${ITEMS[id]?.sprite || id}.png" alt="">`;
   const load = async id => {
     details[id] ||= await PokeAPI.loadDetails(id);
     return details[id];
@@ -33,15 +33,6 @@
   const healTeam = (team, share, revive = 0) => team.map(m => ({ ...m, hp: m.hp <= 0 ? revive : Math.min(1, m.hp + share) }));
   const counts = ids => ids.reduce((bag, id) => ({ ...bag, [id]: (bag[id] || 0) + 1 }), {});
   const itemsText = bundle => Object.entries(bundle).map(([id, n]) => `${n > 1 ? `${n} ` : ''}${ITEMS[id].name}${n > 1 ? 's' : ''}`).join(' and ');
-
-  function readTeam() {
-    try {
-      const team = JSON.parse(localStorage.getItem('pokemonTeam'));
-      return Array.isArray(team) && team.length === 3 ? team.map(p => p.id) : null;
-    } catch {
-      return null;
-    }
-  }
 
   function setSprite(img, id) {
     const sources = PokeAPI.spriteSources(id);
@@ -83,18 +74,25 @@
   }
 
   async function renderTeam() {
-    const ids = run ? run.team.map(m => m.id) : readTeam() || [];
+    const ids = run ? run.team.map(m => m.id) : [];
     const list = await Promise.all(ids.map(load));
-    els.team.innerHTML = list.map((d, i) => monCard(d, { hp: run ? run.team[i].hp : 1 })).join('') || '<p class="av-empty">No team yet.</p>';
+    els.team.innerHTML = list.map((d, i) => monCard(d, { hp: run.team[i].hp })).join('') || '<p class="av-empty">No team yet.</p>';
     els.team.querySelectorAll('.av-mon').forEach(b => { b.tabIndex = -1; });
     fillSprites(els.team);
   }
 
+  // Items marked for the map (healing, revives, Evolution Stones) can be used between stops.
   function renderBag() {
     const bag = run?.bag || {};
-    const items = Object.entries(bag).filter(([, n]) => n > 0);
+    const items = Object.entries(bag).filter(([id, n]) => n > 0 && ITEMS[id]);
+    const usable = Boolean(run && !run.over && !run.pending);
     els.bag.innerHTML = items.length
-      ? items.map(([id, n]) => `<span class="av-item" title="${ITEMS[id].name}: ${ITEMS[id].text}">${itemImg(id)}<b>×${n}</b></span>`).join('')
+      ? items.map(([id, n]) => {
+        const title = `${ITEMS[id].name}: ${ITEMS[id].text}${ITEMS[id].map ? '' : ' (battle only)'}`;
+        return ITEMS[id].map && usable
+          ? `<button type="button" class="av-item use" data-item="${id}" title="${title} Click to use.">${itemImg(id)}<b>×${n}</b></button>`
+          : `<span class="av-item" title="${title}">${itemImg(id)}<b>×${n}</b></span>`;
+      }).join('')
       : '<p class="av-empty">Empty</p>';
   }
 
@@ -270,6 +268,7 @@
   function openStop() {
     if (!run) return startDialog();
     if (run.over) return overDialog();
+    if (!run.intro && !run.path.length) return introDialog();
     const p = run.pending;
     if (!p) {
       closeDialog();
@@ -277,7 +276,7 @@
     }
     const node = Adventure.currentNode(run);
     if (p.kind === 'battle') return battleDialog(node);
-    if (p.kind === 'recruit') return recruitDialog(p.options);
+    if (p.kind === 'recruit') return recruitDialog(p.options, p.drops);
     if (p.kind === 'reward') return rewardDialog(p.options);
     if (p.kind === 'treasure') return treasureDialog(p.items);
     if (p.kind === 'center') return centerDialog();
@@ -286,17 +285,21 @@
 
   // ---------- Start and end ----------
 
-  async function startDialog() {
-    const ids = readTeam();
-    if (!ids) {
-      showDialog({
-        kicker: 'Adventure', title: 'Pick a team first',
-        body: '<p>Choose three Pokémon on the team select screen, then come back to set out.</p>',
-        choices: [{ label: 'Go to team select', primary: true, onClick: () => { location.href = 'team.html?mode=adventure'; } }],
-      });
-      return;
-    }
-    const team = await Promise.all(ids.map(load));
+  // With no adventure saved, send you off to pick a team; team select starts the run.
+  function startDialog() {
+    showDialog({
+      kicker: 'Adventure', title: 'Pick your team',
+      body: '<p>An adventure starts with three 1★ Pokémon. Choose them on the team select screen, then set out.</p>',
+      choices: [
+        { label: 'Pick a 1★ team', primary: true, onClick: () => { location.href = 'team.html?mode=adventure'; } },
+        { label: 'Menu', onClick: () => { location.href = 'index.html'; } },
+      ],
+    });
+  }
+
+  // Shown once, when a freshly started adventure is first opened.
+  async function introDialog() {
+    const team = await Promise.all(run.team.map(m => load(m.id)));
     showDialog({
       kicker: 'A new adventure', title: 'Set out on the route',
       body: `
@@ -304,7 +307,8 @@
         trainers, Pokémon Centers, treasure and chance encounters.</p>
         <ul class="av-rules">
           <li>HP, fainted Pokémon, your bag and evolutions <b>carry over</b> between stops.</li>
-          <li>Beat wild Pokémon and one of them can <b>join your team</b>.</li>
+          <li>Every win pays out: wild Pokémon <b>drop items</b> and one can <b>join your team</b>; trainers hand over prizes.</li>
+          <li>An <b>Evolution Stone</b> evolves any Pokémon that has a next stage. Click items in your bag to use them between stops.</li>
           <li>If your whole team faints, the adventure is over.</li>
         </ul>
         <div class="av-picks">${team.map(d => monCard(d, { hp: 1 })).join('')}</div>`,
@@ -317,10 +321,7 @@
   }
 
   function begin() {
-    const ids = readTeam();
-    if (!ids) return;
-    Adventure.start(ids);
-    run = Adventure.getRun();
+    run = Adventure.resolve({ intro: true });
     closeDialog();
     renderAll();
     gsap.from('.av-node', { scale: 0, opacity: 0, duration: 0.35, stagger: 0.02, ease: 'back.out(2)' });
@@ -333,7 +334,7 @@
     const team = await Promise.all(run.team.map(m => load(m.id)));
     const cards = `<div class="av-picks">${team.map((d, i) => monCard(d, { hp: run.team[i].hp })).join('')}</div>`;
     const again = [
-      { label: 'New adventure', primary: true, onClick: () => { Adventure.clear(); run = null; renderAll(); startDialog(); } },
+      { label: 'New adventure', primary: true, onClick: () => { Adventure.clear(); location.href = 'team.html?mode=adventure'; } },
       { label: 'Menu', onClick: () => { location.href = 'index.html'; } },
     ];
     if (run.won) {
@@ -409,11 +410,15 @@
     finish({ team }, message);
   }
 
-  async function recruitDialog(options) {
+  // drops: the items the beaten Pokémon left behind (already in the bag).
+  async function recruitDialog(options, drops = []) {
     const foes = await Promise.all(options.map(load));
+    const loot = drops.length ? `
+      <p>They dropped ${itemsText(counts(drops))}, now in your bag.</p>
+      <div class="av-loot small">${drops.map(id => `<span class="av-loot-item">${itemImg(id)}<b>${ITEMS[id].name}</b></span>`).join('')}</div>` : '';
     showDialog({
       kicker: kickerOf('wild'), title: 'A wild Pokémon wants to join!',
-      body: `<p>Impressed by your team, one of the Pokémon you beat would like to come along. Pick one to recruit, or travel on as you are.</p>
+      body: `${loot}<p>Impressed by your team, one of the Pokémon you beat would like to come along. Pick one to recruit, or travel on as you are.</p>
         <div class="av-picks">${foes.map((d, i) => monCard(d, { index: i })).join('')}</div>`,
       picks: i => {
         const d = foes[i];
@@ -421,7 +426,7 @@
           kicker: kickerOf('wild'), title: `Who makes room for ${d.name}?`,
           text: `${d.name} joins at full health. The Pokémon it replaces leaves your team.`,
           onPick: slot => swapIn(slot, d.id, `${d.name} joined your team in place of ${details[run.team[slot].id].name}!`),
-          back: () => recruitDialog(options),
+          back: () => recruitDialog(options, drops),
         });
       },
       choices: [{ label: 'No thanks', onClick: () => finish({}) }],
@@ -472,11 +477,11 @@
       kicker, title: 'Pokémon Center',
       body: `<p>Take a break here. You have time for one thing before moving on:</p>
         <ul class="av-rules">
-          <li><b>Rest:</b> every Pokémon recovers half its max HP, and fainted Pokémon are revived with half.</li>
+          <li><b>Rest:</b> every Pokémon is fully healed, and fainted Pokémon are revived with half their HP.</li>
           <li><b>Train:</b> one Pokémon evolves into its next stage, keeping its share of HP.</li>
         </ul>`,
       choices: [
-        { label: 'Rest', primary: true, onClick: () => finish({ team: healTeam(run.team, 0.5, 0.5) }, 'Your team is rested and ready.') },
+        { label: 'Rest', primary: true, onClick: () => finish({ team: healTeam(run.team, 1, 0.5) }, 'Your team is rested and ready.') },
         {
           label: 'Train', disabled: !options.length, title: options.length ? '' : 'No one on your team can evolve right now',
           onClick: () => chooseEvolver(options, kicker, 'Who trains?', centerDialog),
@@ -497,7 +502,8 @@
 
   // The evolution cutscene, in miniature: the sprite turns to light, flickers between the two
   // forms faster and faster, and bursts into the new one.
-  async function evolveSlot(slot, toId) {
+  // changes: anything else to save with the evolution (the bag, when a stone was used).
+  async function evolveSlot(slot, toId, changes = {}) {
     const from = await load(run.team[slot].id);
     const to = await load(toId);
     showDialog({
@@ -534,7 +540,7 @@
     done.textContent = 'Continue';
     done.addEventListener('click', () => {
       Music.play('menu');
-      finish({ team });
+      finish({ ...changes, team });
     });
     els.choices.append(done);
     done.focus();
@@ -548,7 +554,7 @@
         kicker, title: 'A berry grove',
         body: '<p>Branches heavy with ripe berries hang over the path.</p>',
         choices: [
-          { label: 'Share the berries', primary: true, onClick: () => finish({ team: healTeam(run.team, 0.3) }, 'Everyone still standing recovered 30% HP.') },
+          { label: 'Share the berries', primary: true, onClick: () => finish({ team: healTeam(run.team, 0.4) }, 'Everyone still standing recovered 40% HP.') },
           {
             label: 'Save a Sitrus Berry for one',
             onClick: () => chooseSlot({
@@ -605,24 +611,63 @@
       showDialog({
         kicker, title: 'A hot spring',
         body: '<p>Steam drifts from a warm pool among the rocks. Your team looks tired.</p>',
-        choices: [{ label: 'Take a soak', primary: true, onClick: () => finish({ team: healTeam(run.team, 0.25, 0.25) }, 'Everyone recovered 25% HP. Fainted Pokémon woke up!') }],
+        choices: [{ label: 'Take a soak', primary: true, onClick: () => finish({ team: healTeam(run.team, 0.4, 0.4) }, 'Everyone recovered 40% HP. Fainted Pokémon woke up!') }],
       });
     } else {
-      showDialog({ kicker, title: 'A glinting stone', body: '<p>Checking on your team…</p>' });
-      const options = await evolvable();
       showDialog({
         kicker, title: 'A glinting stone',
-        body: options.length
-          ? '<p>An Evolution Stone lies half-buried in the grass. It hums when your Pokémon come near.</p>'
-          : '<p>An Evolution Stone lies in the grass, but none of your Pokémon can use it. A passing hiker offers a Revive for it.</p>',
-        choices: options.length
-          ? [
-            { label: 'Use the stone', primary: true, onClick: () => chooseEvolver(options, kicker, 'Who touches the stone?', () => eventDialog(p)) },
-            { label: 'Leave it', onClick: () => finish({}) },
-          ]
-          : [{ label: 'Trade it for a Revive', primary: true, onClick: () => finish({ bag: Adventure.addItems(run.bag, { revive: 1 }) }, 'Added a Revive to your bag.') }],
+        body: `<p>An Evolution Stone lies half-buried in the grass. It hums when your Pokémon come near: it works on any of them that can still evolve.</p>
+          <div class="av-loot"><span class="av-loot-item">${itemImg('evo-stone')}<b>${ITEMS['evo-stone'].name}</b></span></div>`,
+        choices: [{ label: 'Pick it up', primary: true, onClick: () => finish({ bag: Adventure.addItems(run.bag, { 'evo-stone': 1 }) }, 'Added an Evolution Stone to your bag.') }],
       });
     }
+  }
+
+  // ---------- Using items on the map ----------
+
+  // Max HP at level 50, to turn a Potion's flat HP into a share of the bar.
+  const maxHpOf = d => Combat.createFighter(d, 'party', 0).maxHp;
+  const POTIONS = { potion: 20, 'super-potion': 60 };
+
+  async function useItem(id) {
+    if (busy || !run || run.over || run.pending || !(run.bag[id] > 0) || !ITEMS[id]?.map) return;
+    const item = ITEMS[id];
+    const kicker = `${itemImg(id)} ${item.name}`;
+    const spend = () => Adventure.addItems(run.bag, { [id]: -1 });
+    if (id === 'evo-stone') {
+      showDialog({ kicker, title: item.name, body: '<p>Checking on your team…</p>' });
+      const options = await evolvable();
+      if (!options.length) {
+        showDialog({
+          kicker, title: item.name, body: '<p>None of your Pokémon can evolve any further right now. Save the stone for later.</p>',
+          choices: [{ label: 'Back', primary: true, onClick: closeDialog }],
+        });
+        return;
+      }
+      chooseSlot({
+        kicker, title: 'Who touches the stone?',
+        text: 'Pick a Pokémon to evolve. It keeps its moves and its share of HP.',
+        filter: (_, slot) => options.some(o => o.slot === slot),
+        onPick: slot => evolveSlot(slot, pick(options.find(o => o.slot === slot).stages), { bag: spend() }),
+        back: closeDialog,
+      });
+      return;
+    }
+    const reviving = id === 'revive' || id === 'max-revive';
+    const team = await Promise.all(run.team.map(m => load(m.id)));
+    chooseSlot({
+      kicker, title: `Use the ${item.name} on…`, text: item.text,
+      filter: m => (reviving ? m.hp <= 0 : m.hp > 0 && m.hp < 1),
+      onPick: slot => {
+        const m = run.team[slot];
+        const hp = reviving ? (id === 'max-revive' ? 1 : 0.5)
+          : POTIONS[id] ? Math.min(1, m.hp + POTIONS[id] / maxHpOf(team[slot])) : 1;
+        const name = team[slot].name;
+        finish({ team: run.team.map((x, i) => (i === slot ? { ...x, hp } : x)), bag: spend() },
+          reviving ? `${name} was revived with ${pct(hp)} HP!` : `${name} recovered to ${pct(hp)} HP.`);
+      },
+      back: closeDialog,
+    });
   }
 
   // ---------- Controls ----------
@@ -666,6 +711,10 @@
       if (node) travel(node.dataset.key);
     });
     els.quit.addEventListener('click', quit);
+    els.bag.addEventListener('click', e => {
+      const item = e.target.closest('.av-item.use');
+      if (item && els.dialog.hidden) useItem(item.dataset.item);
+    });
     els.music.addEventListener('click', () => {
       Music.toggle();
       updateMusicButton();
